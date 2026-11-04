@@ -349,7 +349,7 @@ const chips=(k,ops)=>`<div class="chips">${ops.map(([v,l])=>`<button type="butto
 function datos(pares){const p=pares.filter(x=>x[1]);if(!p.length)return '';return `<dl class="panel datos">${p.map(([l,v,html,ancho])=>`<div${ancho?' class="ancho"':''}><dt>${esc(l)}</dt><dd>${html?v:esc(v)}</dd></div>`).join('')}</dl>`}
 
 function ficha(ent,o,saltar=[]){return datos(campos(ent).filter(f=>!saltar.includes(f.k)&&f.t!=='cliente'&&f.t!=='expediente').map(f=>{const v=o[f.k];if(v===undefined||v===null||v==='')return[f.l,''];
- if(f.t==='tel')return[f.l,`<a href="tel:${esc(String(v).replace(/\s/g,''))}">${esc(v)}</a>`,1];
+ if(f.t==='tel'){const ns=String(v).match(/\+?\d[\d\s.-]{5,}\d/g);return[f.l,ns?esc(v).replace(/\+?\d[\d\s.-]{5,}\d/g,m=>`<a href="tel:${m.replace(/[\s.-]/g,'')}">${m}</a>`):esc(v),1]}
  if(f.t==='email')return[f.l,`<a href="mailto:${esc(v)}">${esc(v)}</a>`,1];
  if(f.t==='date')return[f.l,fFecha(v)];
  return[f.l,String(v),0,f.t==='area']}))}
@@ -425,22 +425,48 @@ V.factura=id=>{const f=byId('facturas',id);if(!f)return noEnc('#facturas','Factu
   `<p class="${t.pend>0.004?'pend':'ok'}">${t.pend>0.004?`Pendiente de cobro: ${eur(t.pend)}`:'Cobrada por completo.'}</p>`)};
 
 /* ---------- Ajustes e importación ---------- */
-const IMP={dest:'clientes',cols:[],rows:[],map:{},nombre:'',nuevos:{}};
+const IMP={dest:'clientes',cols:[],rows:[],map:{},nombre:'',nuevos:{},ocultas:[],aviso:''};
 const ENTD={clientes:'cliente',expedientes:'expediente',eventos:'evento'};
 const impCampos=d=>campos(ENTD[d]);
-function libresImp(){const usadas=new Set(Object.values(IMP.map).filter(Boolean));return IMP.cols.map((c,i)=>({c,i,...(IMP.nuevos[i]||{on:true,nombre:c})})).filter(x=>!usadas.has(x.c)&&IMP.rows.some(r=>r[x.c]))}
+function libresImp(){const usadas=new Set(Object.values(IMP.map).filter(Boolean));return IMP.cols.map((c,i)=>({c,i,...(IMP.nuevos[i]||{on:!IMP.ocultas.includes(c),nombre:c})})).filter(x=>!usadas.has(x.c)&&IMP.rows.some(r=>r[x.c]))}
 const ejemplo=c=>{const v=(IMP.rows.find(r=>r[c])||{})[c]||'';return v.length>40?v.slice(0,40)+'…':v};
 const IMPL={clienteId:'Cliente (nombre o NIF)',expedienteId:'Expediente (número o autos)'};
-const SIN={nombre:['nombre','razon social','cliente','apellidos y nombre','nombre y apellidos','denominacion'],tipo:['tipo cliente','tipo'],nif:['nif','cif','dni','nie','nif cif'],telefono:['telefono','tlf','telf','movil','tfno'],email:['email','e mail','correo','mail','correo electronico'],direccion:['direccion','domicilio','calle'],cp:['cp','c p','codigo postal','cod postal'],poblacion:['poblacion','localidad','ciudad','municipio'],notas:['notas','observaciones','comentarios'],clienteId:['cliente','nombre cliente','nif cliente'],asunto:['asunto','descripcion','objeto','titulo'],numero:['expediente','n expediente','num expediente','n exp','referencia','codigo'],apertura:['apertura','fecha apertura','fecha alta','alta'],materia:['materia','jurisdiccion','especialidad'],estado:['estado','situacion'],juzgado:['juzgado','tribunal','organo','organo judicial'],autos:['autos','procedimiento','n procedimiento','n autos'],contrario:['contrario','parte contraria','adverso','contraparte'],letradoContrario:['letrado contrario','abogado contrario'],procurador:['procurador'],titulo:['descripcion','asunto','titulo','concepto','actuacion'],fecha:['fecha','vencimiento','fecha vencimiento','dia'],hora:['hora'],lugar:['lugar','sala'],expedienteId:['expediente','n expediente','num expediente','autos']};
+const SIN={nombre:['nombre completo','nombre','razon social','cliente','apellidos y nombre','nombre y apellidos','denominacion'],tipo:['tipo cliente','tipo'],nif:['nif','cif','dni','nie','nif cif'],telefono:['telefono','telefonos','tlf','telf','movil','tfno'],email:['email','e mail','correo','mail','correo electronico'],direccion:['direccion','domicilio','calle'],cp:['cp','c p','c postal','codigo postal','cod postal'],poblacion:['poblacion','localidad','ciudad','municipio'],notas:['notas','observaciones','comentarios'],clienteId:['cliente','nombre cliente','nif cliente'],asunto:['asunto','descripcion','objeto','titulo'],numero:['expediente','n expediente','num expediente','n exp','referencia','codigo'],apertura:['apertura','fecha apertura','fecha alta','alta'],materia:['materia','jurisdiccion','especialidad'],estado:['estado','situacion'],juzgado:['juzgado','tribunal','organo','organo judicial'],autos:['autos','procedimiento','n procedimiento','n autos'],contrario:['contrario','parte contraria','adverso','contraparte'],letradoContrario:['letrado contrario','abogado contrario'],procurador:['procurador'],titulo:['descripcion','asunto','titulo','concepto','actuacion'],fecha:['fecha','vencimiento','fecha vencimiento','dia'],hora:['hora'],lugar:['lugar','sala'],expedienteId:['expediente','n expediente','num expediente','autos']};
 function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c,nrm2(c)]);
  for(const f of impCampos(dest)){const sy=[...(SIN[f.k]||[]),f.l].map(nrm2);
-  const hit=nc.find(([c,n])=>!usadas.has(c)&&sy.includes(n))||nc.find(([c,n])=>!usadas.has(c)&&sy.some(s=>s.length>2&&n.includes(s)));
+  let hit=null;for(const s of sy){hit=nc.find(([c,n])=>!usadas.has(c)&&n===s);if(hit)break}
+  if(!hit)for(const s of sy){if(s.length<3)continue;hit=nc.find(([c,n])=>!usadas.has(c)&&n.includes(s));if(hit)break}
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
+const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones'];
+const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
+const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
+function esFichas(filas){let n=0,cod=false;for(const r of filas.slice(0,80))for(const x of r){const s=String(x).trim();if(/:$/.test(s)&&s.length<40){n++;if(nrm2(s)==='codigo')cod=true}}return cod&&n>=5}
+function leerFichas(filas){const recs=[];let cur=null,modo=null,cabs=[];
+ const etiq=s=>/:$/.test(s)&&s.length<40;
+ const asigna=fila=>{const o={};fila.forEach((v,i)=>{if(!v)return;let c=cabs[0];for(const x of cabs)if(x.i<=i)c=x;o[c.n]=o[c.n]?o[c.n]+' '+v:v});return o};
+ for(const raw of filas){const fila=raw.map(x=>String(x??'').trim());const no=fila.filter(Boolean);if(!no.length)continue;
+  const labs=[];fila.forEach((s,i)=>{if(etiq(s))labs.push(i)});
+  if(labs.length){modo=null;labs.forEach((i,j)=>{const fin=j+1<labs.length?labs[j+1]:fila.length,k=bonito(fila[i]);let v='';for(let x=i+1;x<fin;x++)if(fila[x]){v=fila[x];break}
+    if(nrm2(fila[i])==='codigo'){if(cur)recs.push(cur);cur={}}if(cur&&(v||!(k in cur)))cur[k]=v});continue}
+  if(!cur)continue;
+  const nn=no.map(nrm2);
+  if(no.length===1&&(TITULOS.includes(nn[0])||/^empresa|^pagina|^pag /.test(nn[0]))){modo=null;continue}
+  if(nn.includes('telefono')&&(nn.includes('contacto')||nn.includes('tipo'))){modo='tel';cabs=[];fila.forEach((s,i)=>{if(s)cabs.push({i,n:bonito(s)})});continue}
+  if(nn.includes('iban')||(nn.includes('banco')&&nn.includes('cuenta'))){modo='banco';cabs=[];fila.forEach((s,i)=>{if(s)cabs.push({i,n:bonito(s)})});continue}
+  if(modo==='tel'){const o=asigna(fila),num=o[cabs[0].n]||'',resto=cabs.slice(1).map(c=>o[c.n]).filter(Boolean).join(', ');cur['Teléfonos']=(cur['Teléfonos']?cur['Teléfonos']+'; ':'')+num+(resto?' ('+resto+')':'');continue}
+  if(modo==='banco'){Object.assign(cur,asigna(fila));modo=null;continue}}
+ if(cur)recs.push(cur);
+ for(const r of recs)r['Nombre completo']=[r['Nombre'],r['Apellidos']].filter(Boolean).join(' ').trim()||r['Nombre común']||'';
+ const cols=[];for(const r of recs)for(const k of Object.keys(r))if(!cols.includes(k))cols.push(k);
+ const rows=recs.map(r=>Object.fromEntries(cols.map(c=>[c,r[c]||''])));
+ if(!rows.length)throw new Error('No se han encontrado fichas de clientes en el archivo.');
+ return{cols,rows,ocultas:['Nombre','Apellidos','Nombre común'],aviso:`Archivo en formato de ficha: se han encontrado ${rows.length} clientes.`}}
 async function leerHoja(file){
  if(!window.XLSX)await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
  const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});const ws=wb.Sheets[wb.SheetNames[0]];
- const filas=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,dateNF:'yyyy-mm-dd',blankrows:false});
+ let filas=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,dateNF:'yyyy-mm-dd',blankrows:false});
+ if(esFichas(filas)){for(const n of wb.SheetNames.slice(1))filas=filas.concat(XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:'',raw:false,dateNF:'yyyy-mm-dd',blankrows:false}));return leerFichas(filas)}
  const hi=filas.findIndex(r=>r.filter(x=>String(x).trim()).length>=2);if(hi<0)throw new Error('El archivo no tiene datos que se puedan leer.');
  const cols=filas[hi].map((h,i)=>String(h).trim()||'Columna '+(i+1));const vistos={};cols.forEach((c,i)=>{if(vistos[c])cols[i]=c+' ('+(++vistos[c])+')';else vistos[c]=1});
  const rows=filas.slice(hi+1).map(r=>Object.fromEntries(cols.map((c,i)=>[c,String(r[i]??'').trim()]))).filter(o=>Object.values(o).some(Boolean));
@@ -449,7 +475,7 @@ function importHTML(){const cs=impCampos(IMP.dest),lib=IMP.rows.length?libresImp
  return `<div class="panel"><p>Exporta desde tu programa un listado en Excel o CSV y cárgalo aquí. Importa primero los clientes, después los expedientes y por último la agenda, para que queden enlazados entre sí.</p>
  <div class="grid"><div class="fld half"><label for="impD">Qué vas a importar</label><select id="impD" data-c="impDest">${[['clientes','Clientes'],['expedientes','Expedientes'],['eventos','Plazos y citas']].map(([v,l])=>opt(v,l,v===IMP.dest)).join('')}</select></div>
  <div class="fld half"><span class="lbl">Archivo</span><label class="btn ancho">${IMP.nombre?esc(IMP.nombre):'Elegir archivo Excel o CSV'}<input type="file" accept=".xlsx,.xls,.csv,.ods,.txt" data-c="impFile" hidden></label></div></div>
- ${IMP.rows.length?`<p class="nota">${IMP.rows.length} filas encontradas. Revisa qué columna del archivo corresponde a cada dato.</p><div class="mapa">${cs.map(f=>`<div class="fld"><label for="m_${f.k}">${esc(IMPL[f.k]||f.l)}</label><select id="m_${f.k}" data-c="impMap" data-k="${f.k}">${opt('','No importar',!IMP.map[f.k])}${IMP.cols.map(c=>opt(c,c,IMP.map[f.k]===c)).join('')}</select></div>`).join('')}</div>${lib.length?`<h3 class="mes">Columnas que no corresponden a ningún dato</h3><p class="nota">Las marcadas se añadirán a la ficha como datos nuevos, con el nombre que escribas. Desmarca las que no quieras guardar.</p><div class="nuevos">${lib.map(x=>`<div class="nuevo"><input type="checkbox" data-c="impNOn" data-i="${x.i}"${x.on?' checked':''} aria-label="Añadir la columna ${esc(x.c)}"><div class="txt"><div class="s">Columna «${esc(x.c)}». Ejemplo: ${esc(ejemplo(x.c))}</div><input data-c="impNNom" data-i="${x.i}" value="${esc(x.nombre)}" aria-label="Nombre del dato nuevo"></div></div>`).join('')}</div>`:''}<div class="rapidos"><button class="btn pri" data-a="importar">Importar ${IMP.rows.length} filas</button><button class="btn ghost" data-a="impCancel">Cancelar</button></div>`:''}</div>`}
+ ${IMP.rows.length?`<p class="nota">${IMP.aviso?esc(IMP.aviso)+' ':''}${IMP.rows.length} filas encontradas. Revisa qué columna del archivo corresponde a cada dato.</p><div class="mapa">${cs.map(f=>`<div class="fld"><label for="m_${f.k}">${esc(IMPL[f.k]||f.l)}</label><select id="m_${f.k}" data-c="impMap" data-k="${f.k}">${opt('','No importar',!IMP.map[f.k])}${IMP.cols.map(c=>opt(c,c,IMP.map[f.k]===c)).join('')}</select></div>`).join('')}</div>${lib.length?`<h3 class="mes">Columnas que no corresponden a ningún dato</h3><p class="nota">Las marcadas se añadirán a la ficha como datos nuevos, con el nombre que escribas. Desmarca las que no quieras guardar.</p><div class="nuevos">${lib.map(x=>`<div class="nuevo"><input type="checkbox" data-c="impNOn" data-i="${x.i}"${x.on?' checked':''} aria-label="Añadir la columna ${esc(x.c)}"><div class="txt"><div class="s">Columna «${esc(x.c)}». Ejemplo: ${esc(ejemplo(x.c))}</div><input data-c="impNNom" data-i="${x.i}" value="${esc(x.nombre)}" aria-label="Nombre del dato nuevo"></div></div>`).join('')}</div>`:''}<div class="rapidos"><button class="btn pri" data-a="importar">Importar ${IMP.rows.length} filas</button><button class="btn ghost" data-a="impCancel">Cancelar</button></div>`:''}</div>`}
 function importar(){const d=IMP.dest,m=Object.assign({},IMP.map),ent=ENTD[d];
  const nuevos=libresImp().filter(x=>x.on);let creados=0;
  if(nuevos.length){const lista=cfgCampos(ent);for(const x of nuevos){const vals=IMP.rows.map(r=>r[x.c]).filter(Boolean);const t=vals.every(v=>toISO(v))?'date':vals.some(v=>v.length>80)?'area':'text';const k=nuevaClave();lista.push({k,l:(x.nombre||x.c).trim(),t,custom:1});m[k]=x.c;creados++}guardarCfg(ent,lista)}
@@ -457,7 +483,7 @@ function importar(){const d=IMP.dest,m=Object.assign({},IMP.map),ent=ENTD[d];
  const buscaCli=v=>{const nv=norm(v);if(!nv)return null;return S.clientes.find(c=>(c.nif&&norm(c.nif)===nv)||norm(c.nombre)===nv)||S.clientes.find(c=>Object.keys(c).some(k=>k.startsWith('x_')&&norm(c[k])===nv))};
  const buscaExp=v=>{const nv=norm(v);return S.expedientes.find(e=>norm(e.numero)===nv||(e.autos&&norm(e.autos)===nv))};
  for(const r of IMP.rows){const o={};for(const f of cs){o[f.k]=val(r,f.k);if(f.custom&&f.t==='date')o[f.k]=toISO(o[f.k])||o[f.k]}
-  if(d==='clientes'){if(!o.nombre){sin++;continue}if(buscaCli(o.nif||o.nombre)||buscaCli(o.nombre)){rep++;continue}o.tipo=o.tipo||'Particular';S.clientes.push({id:uid(),creado:hoy(),...o});n++}
+  if(d==='clientes'){if(!o.nombre){sin++;continue}if(buscaCli(o.nif||o.nombre)||buscaCli(o.nombre)){rep++;continue}o.tipo=/empres|socied|juridic|\bs\.?[la]\.?\b/i.test(o.tipo)?'Empresa':/particul|fisic/i.test(o.tipo)||!o.tipo?'Particular':o.tipo;S.clientes.push({id:uid(),creado:hoy(),...o});n++}
   else if(d==='expedientes'){if(!o.asunto&&!o.numero){sin++;continue}if(o.numero&&buscaExp(o.numero)){rep++;continue}
    let c=o.clienteId?buscaCli(o.clienteId):null;if(!c&&o.clienteId){c={id:uid(),creado:hoy(),nombre:o.clienteId,tipo:'Particular'};S.clientes.push(c);nuevosCli++}
    o.clienteId=c?c.id:'';o.asunto=o.asunto||o.numero;o.numero=o.numero||sigExp();o.apertura=toISO(o.apertura);o.estado=/archiv|cerrad|baja|finaliz|terminad/i.test(o.estado)?'Archivado':'Abierto';o.materia=o.materia?cap(o.materia.toLowerCase()):'';
@@ -465,7 +491,7 @@ function importar(){const d=IMP.dest,m=Object.assign({},IMP.map),ent=ENTD[d];
   else{o.fecha=toISO(o.fecha);if(!o.fecha||!(o.titulo||o.tipo)){sin++;continue}const x=o.expedienteId?buscaExp(o.expedienteId):null;o.expedienteId=x?x.id:'';
    const tp=TIPOS_EV.find(t=>norm(o.tipo).includes(norm(t).slice(0,5)));o.titulo=o.titulo||o.tipo;o.tipo=tp||(o.tipo?cap(o.tipo):'Plazo');const hm=String(o.hora).match(/(\d{1,2}):(\d{2})/);o.hora=hm?hm[1].padStart(2,'0')+':'+hm[2]:'';
    S.eventos.push({id:uid(),hecho:false,...o});n++}}
- save();Object.assign(IMP,{cols:[],rows:[],map:{},nombre:'',nuevos:{}});render();
+ save();Object.assign(IMP,{cols:[],rows:[],map:{},nombre:'',nuevos:{},ocultas:[],aviso:''});render();
  toast(`Importados ${n}.`+(creados?` Añadidos ${creados} datos nuevos a la ficha.`:'')+(rep?` ${rep} ya existían y se han saltado.`:'')+(sin?` ${sin} filas sin datos suficientes.`:'')+(nuevosCli?` Se han creado ${nuevosCli} clientes nuevos.`:''))}
 V.ajustes=()=>{const d=S.ajustes.despacho,a=S.ajustes;
  return cab('Ajustes')+
@@ -545,7 +571,7 @@ const ACT={
  delCampo:(id,b)=>{if(!confirm('¿Quitar este dato de las fichas? Lo ya escrito no se borra, pero dejará de verse.'))return;const l=cfgCampos(CE);l.splice(+b.dataset.i,1);guardarCfg(CE,l);dlg.close();save();render();toast('Dato quitado')},
  guardarAj:()=>{document.querySelectorAll('[data-d]').forEach(i=>S.ajustes.despacho[i.dataset.d]=i.value.trim());S.ajustes.serie=$('#a_serie').value.trim();S.ajustes.iva=num($('#a_iva').value);S.ajustes.irpf=num($('#a_irpf').value);save();toast('Datos guardados')},
  importar:()=>importar(),
- impCancel:()=>{Object.assign(IMP,{cols:[],rows:[],map:{},nombre:'',nuevos:{}});render()},
+ impCancel:()=>{Object.assign(IMP,{cols:[],rows:[],map:{},nombre:'',nuevos:{},ocultas:[],aviso:''});render()},
  exportar:()=>{const b=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='despacho-copia-'+hoy()+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)},
  olvido:()=>{const em=$('#lg_e').value.trim(),er=$('#lg_err');if(!em){er.textContent='Escribe primero tu correo y vuelve a pulsar.';return}auth.sendPasswordResetEmail(em).then(()=>{er.textContent='';toast('Te hemos enviado un correo para cambiar la contraseña.')}).catch(x=>{er.textContent=errAuth(x.code)})},
  salir:()=>{if(!confirm('¿Cerrar sesión? Los datos se quitarán de este dispositivo, pero seguirán guardados en tu cuenta.'))return;if(refDatos){refDatos.off();refDatos=null}for(const k of [KEY,KEY_UID,KEY_CONF])localStorage.removeItem(k);S=normalizar(null);conf={};syncPrev={};auth.signOut()},
@@ -558,8 +584,8 @@ document.addEventListener('change',async e=>{const t=e.target,c=t.dataset&&t.dat
  if(c==='hecho'){const ev=byId('eventos',t.dataset.id);if(!ev)return;ev.hecho=t.checked;save();render();toast(t.checked?'Marcado como hecho':'Marcado como pendiente')}
  else if(c==='impDest'){IMP.dest=t.value;IMP.map=adivinar(IMP.cols,IMP.dest);IMP.nuevos={};render()}
  else if(c==='impMap'){IMP.map[t.dataset.k]=t.value;render()}
- else if(c==='impNOn'||c==='impNNom'){const i=+t.dataset.i;const n=IMP.nuevos[i]||{on:true,nombre:IMP.cols[i]};if(c==='impNOn')n.on=t.checked;else n.nombre=t.value.trim()||IMP.cols[i];IMP.nuevos[i]=n}
- else if(c==='impFile'){const f=t.files[0];if(!f)return;toast('Leyendo el archivo…');try{const r=await leerHoja(f);Object.assign(IMP,{cols:r.cols,rows:r.rows,nombre:f.name,map:adivinar(r.cols,IMP.dest),nuevos:{}});render()}catch(err){toast(err.message||'No se ha podido leer el archivo.')}}
+ else if(c==='impNOn'||c==='impNNom'){const i=+t.dataset.i;const n=IMP.nuevos[i]||{on:!IMP.ocultas.includes(IMP.cols[i]),nombre:IMP.cols[i]};if(c==='impNOn')n.on=t.checked;else n.nombre=t.value.trim()||IMP.cols[i];IMP.nuevos[i]=n}
+ else if(c==='impFile'){const f=t.files[0];if(!f)return;toast('Leyendo el archivo…');try{const r=await leerHoja(f);Object.assign(IMP,{cols:r.cols,rows:r.rows,nombre:f.name,map:adivinar(r.cols,IMP.dest),nuevos:{},ocultas:r.ocultas||[],aviso:r.aviso||''});render()}catch(err){toast(err.message||'No se ha podido leer el archivo.')}}
  else if(c==='restaurar'){const f=t.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.clientes))throw 0;if(!confirm(`La copia tiene ${d.clientes.length} clientes y ${(d.expedientes||[]).length} expedientes. Sustituirá todos los datos actuales${fbOk&&usuario?', también en la nube':''}. ¿Continuar?`))return;S=normalizar(d);save();render();toast('Copia recuperada')}catch(err){toast('Ese archivo no es una copia de esta app.')}}});
 
 /* ---------- Arranque ---------- */
