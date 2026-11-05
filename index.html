@@ -153,6 +153,8 @@ body.sin-sesion main{margin:0 auto}
 .nuevo{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
 .nuevo>input[type=checkbox]{width:24px;height:24px;min-height:0;flex:none;accent-color:var(--accent)}
 .nuevo .txt input{margin-top:4px}
+.tl .actimp{font-size:14.5px;font-variant-numeric:tabular-nums;color:var(--ok)}
+.tl .actimp.neg{color:var(--warn)}
 #print{display:none}
 @media print{
  .app,#toast,dialog{display:none!important}
@@ -380,7 +382,7 @@ function evRow(e){const d=dias(e.fecha),a=Math.abs(d),x=expDe(e.expedienteId);
  const cls=e.hecho?'hecho':d<=0?'urg':d<=3?'pronto':'';
  const blq=d===0?'<b>Hoy</b>':`<b>${a}</b><small>${d<0?(a===1?'día tarde':'días tarde'):(a===1?'día':'días')}</small>`;
  return `<div class="row${e.hecho?' is-hecho':''}"><label class="chk" title="Marcar como hecho"><input type="checkbox" data-c="hecho" data-id="${e.id}"${e.hecho?' checked':''} aria-label="Hecho"></label><div class="dias ${cls}">${blq}</div><div class="txt" data-a="editEv" data-id="${e.id}"><div class="t">${esc(e.titulo)}</div><div class="s">${esc(e.tipo||'')}, ${fFecha(e.fecha)}${e.hora?' a las '+esc(e.hora):''}${e.lugar?', '+esc(e.lugar):''}</div>${x?`<div class="s">Exp. ${esc(x.numero)}, ${esc(cliNom(x.clienteId))}</div>`:''}</div></div>`}
-function expRow(e){return `<a class="row" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(e.asunto)}</div><div class="s">${esc([cliNom(e.clienteId),e.materia,e.juzgado].filter(Boolean).join(', '))}</div></div>${e.estado==='Archivado'?'<span class="tag">Archivado</span>':''}</a>`}
+function expRow(e){const solo=!e.asunto||e.asunto===e.numero;return `<a class="row" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?cliNom(e.clienteId):e.asunto)}</div><div class="s">${esc([solo?'':cliNom(e.clienteId),e.materia,e.juzgado].filter(Boolean).join(', '))}</div></div>${e.estado==='Archivado'?'<span class="tag">Archivado</span>':''}</a>`}
 function facRow(f){const t=tot(f),x=expDe(f.expedienteId);return `<a class="row" href="#factura/${f.id}"><div class="num">${esc(f.numero)}</div><div class="txt"><div class="t">${esc(cliNom(f.clienteId))}</div><div class="s">${fFecha(f.fecha)}${x?', '+esc(x.asunto):''}</div></div><div class="imp"><b>${eur(t.total)}</b>${t.pend>0.004?`<small class="pend">Pendiente ${eur(t.pend)}</small>`:'<small class="ok">Cobrada</small>'}</div></a>`}
 function totalesHTML(f,t){return `<table class="tot"><tr><td>Base imponible</td><td class="r">${eur(t.base)}</td></tr><tr><td>IVA ${esc(f.iva)} %</td><td class="r">${eur(t.iva)}</td></tr>${num(f.irpf)?`<tr><td>Retención IRPF ${esc(f.irpf)} %</td><td class="r">−${eur(t.irpf)}</td></tr>`:''}${t.sup?`<tr><td>Suplidos</td><td class="r">${eur(t.sup)}</td></tr>`:''}<tr class="gt"><td>Total</td><td class="r">${eur(t.total)}</td></tr></table>`}
 
@@ -421,10 +423,10 @@ V.expediente=id=>{const e=byId('expedientes',id);if(!e)return noEnc('#expediente
  const ev=S.eventos.filter(x=>x.expedienteId===id).sort((a,b)=>(a.hecho-b.hecho)||cmpEv(a,b));
  const act=[...(e.actuaciones||[])].sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
  const fa=S.facturas.filter(f=>f.expedienteId===id).sort(cmpFac);
- return volver('#expedientes','Expedientes')+cab(e.asunto,`<button class="btn" data-a="editExp" data-id="${id}">Editar</button><button class="btn ghost dan" data-a="delExp" data-id="${id}">Borrar</button>`,`Expediente ${esc(e.numero)}, <a href="#cliente/${e.clienteId}">${esc(cliNom(e.clienteId))}</a>`)+
+ return volver('#expedientes','Expedientes')+cab(e.asunto,`<button class="btn" data-a="editExp" data-id="${id}">Editar</button><button class="btn ghost dan" data-a="delExp" data-id="${id}">Borrar</button>`,`${e.asunto&&e.asunto!==e.numero?'Expediente '+esc(e.numero)+', ':''}<a href="#cliente/${e.clienteId}">${esc(cliNom(e.clienteId))}</a>`)+
  ficha('expediente',e,['asunto','numero'])+
  sec('Plazos y citas',`<button class="btn sm" data-a="nuevoEv" data-exp="${id}">Añadir</button>`,ev.length?`<div class="list">${ev.map(evRow).join('')}</div>`:vacio('Sin plazos ni citas.'))+
- sec('Actuaciones','',`<div class="panel"><div class="addact"><input type="date" id="actF" value="${hoy()}" aria-label="Fecha"><textarea id="actT" rows="2" placeholder="Escrito presentado, llamada, notificación…" aria-label="Actuación"></textarea><button class="btn pri" data-a="addAct" data-id="${id}">Añadir</button></div>${act.length?`<ol class="tl">${act.map(a=>`<li><time>${fFecha(a.fecha)}</time><p>${esc(a.texto)}</p><button type="button" class="x" data-a="delAct" data-id="${id}" data-act="${a.id}" aria-label="Borrar actuación">×</button></li>`).join('')}</ol>`:''}</div>`)+
+ sec('Actuaciones','',`<div class="panel"><div class="addact"><input type="date" id="actF" value="${hoy()}" aria-label="Fecha"><textarea id="actT" rows="2" placeholder="Escrito presentado, llamada, notificación…" aria-label="Actuación"></textarea><button class="btn pri" data-a="addAct" data-id="${id}">Añadir</button></div>${act.length?`<ol class="tl">${act.map(a=>`<li><time>${fFecha(a.fecha)}${a.hora?', '+esc(a.hora):''}</time><p>${esc(a.texto)}</p>${a.importe?`<p class="actimp ${a.importe<0?'neg':''}">${eur(a.importe)}</p>`:''}<button type="button" class="x" data-a="delAct" data-id="${id}" data-act="${a.id}" aria-label="Borrar actuación">×</button></li>`).join('')}</ol>`:''}</div>`)+
  sec('Facturas',`<button class="btn sm" data-a="nuevaFac" data-exp="${id}">Nueva factura</button>`,fa.length?`<div class="list">${fa.map(facRow).join('')}</div>`:vacio('Sin facturas.'))};
 
 L.agenda=()=>{if(!S.eventos.length)return vacio('La agenda está vacía. Pulsa «Nuevo» para apuntar un plazo, un señalamiento o una cita.');
@@ -453,7 +455,7 @@ const impCampos=d=>campos(ENTD[d]);
 function libresImp(){const usadas=new Set(Object.values(IMP.map).filter(Boolean));return IMP.cols.map((c,i)=>({c,i,...(IMP.nuevos[i]||{on:!IMP.ocultas.includes(c),nombre:c})})).filter(x=>!usadas.has(x.c)&&IMP.rows.some(r=>r[x.c]))}
 const ejemplo=c=>{const v=(IMP.rows.find(r=>r[c])||{})[c]||'';return v.length>40?v.slice(0,40)+'…':v};
 const IMPL={clienteId:'Cliente (nombre o NIF)',expedienteId:'Expediente (número o autos)'};
-const SIN={nombre:['nombre completo','nombre','razon social','cliente','apellidos y nombre','nombre y apellidos','denominacion'],tipo:['tipo cliente','tipo'],nif:['nif','cif','dni','nie','nif cif'],telefono:['telefono 1','telefono','telefonos','tlf','telf','movil','tfno'],telefono2:['telefono 2'],telefono3:['telefono 3'],telefono4:['telefono 4'],telefono5:['telefono 5'],email:['correo electronico','email','e mail','correo','mail','correo 1'],email2:['correo 2','email 2','e mail 2'],direccion:['direccion','domicilio','calle'],cp:['cp','c p','c postal','codigo postal','cod postal'],poblacion:['poblacion','localidad','ciudad','municipio'],notas:['notas','observaciones','comentarios'],clienteId:['cliente','nombre cliente','nif cliente'],asunto:['asunto','descripcion','objeto','titulo'],numero:['expediente','n expediente','num expediente','n exp','referencia','codigo'],apertura:['apertura','fecha apertura','fecha alta','alta'],materia:['materia','jurisdiccion','especialidad'],estado:['estado','situacion'],juzgado:['juzgado','tribunal','organo','organo judicial'],autos:['autos','procedimiento','n procedimiento','n autos'],contrario:['contrario','parte contraria','adverso','contraparte'],letradoContrario:['letrado contrario','abogado contrario'],procurador:['procurador'],titulo:['descripcion','asunto','titulo','concepto','actuacion'],fecha:['fecha','vencimiento','fecha vencimiento','dia'],hora:['hora'],lugar:['lugar','sala'],expedienteId:['expediente','n expediente','num expediente','autos']};
+const SIN={nombre:['nombre completo','nombre','razon social','cliente','apellidos y nombre','nombre y apellidos','denominacion'],tipo:['tipo cliente','tipo'],nif:['nif','cif','dni','nie','nif cif'],telefono:['telefono 1','telefono','telefonos','tlf','telf','movil','tfno'],telefono2:['telefono 2'],telefono3:['telefono 3'],telefono4:['telefono 4'],telefono5:['telefono 5'],email:['correo electronico','email','e mail','correo','mail','correo 1'],email2:['correo 2','email 2','e mail 2'],direccion:['direccion','domicilio','calle'],cp:['cp','c p','c postal','codigo postal','cod postal'],poblacion:['poblacion','localidad','ciudad','municipio'],notas:['notas','observaciones','comentarios'],clienteId:['cliente','nombre cliente','nif cliente'],asunto:['asunto','descripcion','objeto','titulo'],numero:['numero','expediente','n expediente','num expediente','n exp','referencia','codigo'],apertura:['fecha de inicio','apertura','fecha apertura','fecha alta','alta'],materia:['materia','jurisdiccion','especialidad'],estado:['estado','situacion'],juzgado:['juzgado','tribunal','organo','organo judicial'],autos:['n de procedimiento','autos','procedimiento','n procedimiento','n autos'],contrario:['contrario','parte contraria','adverso','contraparte'],letradoContrario:['letrado contrario','abogado contrario'],procurador:['procurador'],titulo:['descripcion','asunto','titulo','concepto','actuacion'],fecha:['fecha','vencimiento','fecha vencimiento','dia'],hora:['hora'],lugar:['lugar','sala'],expedienteId:['expediente','n expediente','num expediente','autos']};
 function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c,nrm2(c)]);
  for(const f of impCampos(dest)){const sy=[...(SIN[f.k]||[]),f.l].map(nrm2);
   let hit=null;for(const s of sy){hit=nc.find(([c,n])=>!usadas.has(c)&&n===s);if(hit)break}
@@ -461,7 +463,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='6';
+const VERSION='8';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -482,15 +484,59 @@ function leerFichas(filas){const recs=[];let cur=null,modo=null,cabs=[];
   if(modo==='tel'){const o=asigna(fila),num=o[cabs[0].n]||'',resto=cabs.slice(1).map(c=>o[c.n]).filter(Boolean).join(', ');const t=num+(resto?' ('+resto+')':'');let n=1;while(n<5&&cur['Teléfono '+n])n++;cur['Teléfono '+n]=cur['Teléfono '+n]?cur['Teléfono '+n]+'; '+t:t;continue}
 }
  if(cur)recs.push(cur);
- for(const r of recs)r['Nombre completo']=[r['Nombre'],r['Apellidos']].filter(Boolean).join(' ').trim()||r['Nombre común']||'';
+ for(const r of recs){const nb=(r['Nombre']||'').trim(),ap=(r['Apellidos']||'').trim();r['Nombre completo']=ap&&nb?ap+', '+nb:(ap||nb||r['Nombre común']||'')}
  const cols=[];for(const r of recs)for(const k of Object.keys(r))if(!cols.includes(k))cols.push(k);
  const rows=recs.map(r=>Object.fromEntries(cols.map(c=>[c,r[c]||''])));
  if(!rows.length)throw new Error('No se han encontrado fichas de clientes en el archivo.');
- return{cols,rows,ocultas:['Nombre','Apellidos','Nombre común'],aviso:`Archivo en formato de ficha: se han encontrado ${rows.length} clientes.`}}
+ return{dest:'clientes',cols,rows,ocultas:['Nombre','Apellidos','Nombre común'],aviso:`Archivo en formato de ficha: se han encontrado ${rows.length} clientes.`}}
+function parseImp(s){s=String(s??'').replace(/[€\s]/g,'');if(!s)return 0;if(/,\d{1,2}$/.test(s))s=s.replace(/\./g,'').replace(',','.');else s=s.replace(/,/g,'');return +s||0}
+const sinPref=s=>String(s||'').replace(/^\s*\d+\s*-\s*/,'').replace(/\s*-\s*$/,'').trim();
+const codDe=s=>{const m=String(s||'').match(/^\s*([A-ZÑ0-9]*[*0-9][A-ZÑ0-9*]*)-\s*\S/i);return m?m[1]:''};
+const sinCod=s=>String(s||'').replace(/^[A-ZÑ0-9]*[*0-9][A-ZÑ0-9*]*-\s*/i,'').trim();
+function esExpedientes(filas){let fi=false,ins=false;for(const r of filas.slice(0,300))for(const x of r){const n=nrm2(x);if(n.startsWith('fecha de inicio'))fi=true;if(n==='instancias'||n.startsWith('listado de expedientes'))ins=true}return fi&&ins}
+function leerExpedientes(filas){const F2=filas.map(r=>r.map(x=>String(x??'').trim()));const recs=[];let cur=null,ult='',sec=null,grupos=[],cabs=[];
+ const vacia=r=>!r.some(Boolean),esIni=r=>r.some(s=>nrm2(s).startsWith('fecha de inicio'));
+ const sigIni=i=>{for(let j=i+1;j<F2.length;j++){if(vacia(F2[j]))continue;return esIni(F2[j])}return false};
+ const cabecera=new Set();for(const r of F2){if(esIni(r))break;const no=r.filter(Boolean);if(no.length)no.forEach(s=>cabecera.add(nrm2(s)))}
+ const cab=(fila,f)=>{cabs=[];const vistos={};fila.forEach((s,i)=>{if(!s)return;let n=nrm2(s);const g=f?f(i):'',kk=g+'|'+n;vistos[kk]=(vistos[kk]||0)+1;if(vistos[kk]>1)n+=' '+vistos[kk];cabs.push({i,n,g})})};
+ const asig=fila=>{const o={};fila.forEach((v,i)=>{if(!v||!cabs.length)return;let c=cabs[0];for(const x of cabs)if(x.i<=i)c=x;const k=(c.g?c.g+'|':'')+c.n;o[k]=o[k]?o[k]+' '+v:v});return o};
+ F2.forEach((fila,idx)=>{const no=fila.filter(Boolean);if(!no.length)return;const nn=no.map(nrm2);
+  if(esIni(fila)){if(cur)recs.push(cur);const m=ult.match(/^(.*?)\s+-\s*(.*)$/)||[0,ult,''];cur={numero:m[1].trim(),asunto:m[2].trim(),datos:{},personas:{propios:[],contrarios:[],comunes:[]},inst:[],acts:[]};sec='datos'}
+  if(no.length===1&&sigIni(idx)){ult=no[0];return}
+  if(!cur||nn.every(n=>cabecera.has(n))||nn.some(n=>n.startsWith('listado de expedientes')))return;
+  if(sec==='datos'&&!nn.includes('propios')&&no.some(s=>s.includes(':'))){for(const s of no){const k=s.indexOf(':');if(k>0)cur.datos[nrm2(s.slice(0,k))]=s.slice(k+1).trim()}return}
+  if(nn.includes('propios')||nn.includes('contrarios')||(no.length===1&&nn[0]==='comunes')){sec='personas';cabs=[];grupos=[];fila.forEach((s,i)=>{const n=nrm2(s);if(['propios','contrarios','comunes'].includes(n))grupos.push({n,i})});return}
+  if(sec==='personas'&&nn.includes('nombre')&&nn.includes('relacion')){cab(fila,i=>{let g=grupos.length?grupos[0].n:'comunes';for(const x of grupos)if(x.i<=i)g=x.n;return g});return}
+  if(nn.includes('instancias')){sec='inst';cabs=[];return}
+  if(sec==='inst'&&nn.includes('organismo')){cab(fila);return}
+  if(nn.includes('f inicio')&&nn.includes('descripcion')){sec='acts';cab(fila);return}
+  if(sec==='personas'){const o=asig(fila);for(const g of ['propios','contrarios','comunes']){const nom=o[g+'|nombre'];if(nom)cur.personas[g].push({nombre:nom,rel:o[g+'|relacion']||'',tel:o[g+'|telefono']||''})}return}
+  if(sec==='inst'){const o=asig(fila);if(o.organismo||o.instancia)cur.inst.push(o);return}
+  if(sec==='acts'){const o=asig(fila),f=toISO(o['f inicio']||no[0]);if(!f)return;const hm=String(o.hora||'').match(/(\d{1,2}):(\d{2})/);
+   cur.acts.push({fecha:f,hora:hm?hm[1].padStart(2,'0')+':'+hm[2]:'',tipo:(o.tipo||'').trim(),desc:(o.descripcion||'').trim(),importe:parseImp(o.importe)})}});
+ if(cur)recs.push(cur);
+ if(!recs.length)throw new Error('No se han encontrado expedientes en el archivo.');
+ const COLS=['Número','Asunto','Cliente','Compañero','Fecha de inicio','Estado','Su referencia','Juzgado','Nº de procedimiento','Tipo de expediente','Cuantía inicial','Cuantía final','Parte contraria','Letrado contrario','Procurador','Abogado','Otros intervinientes'];
+ const rows=recs.map(r=>{const p=r.personas,cli=p.propios.find(x=>/client/i.test(x.rel))||p.propios[0];
+  const esLet=x=>/abogad|letrad/i.test(x.rel),esProc=x=>/procurad/i.test(x.rel);
+  const contr=p.contrarios.filter(x=>!esLet(x)&&!esProc(x)),letC=p.contrarios.filter(esLet),proc=[...p.propios,...p.comunes].filter(esProc),abog=p.propios.filter(esLet);
+  const con=x=>sinCod(x.nombre)+(x.tel?' ('+x.tel+')':'');
+  const otros=[...p.propios.filter(x=>x!==cli&&!esLet(x)&&!esProc(x)),...p.comunes.filter(x=>!esProc(x)),...p.contrarios.filter(esProc)].map(x=>sinCod(x.nombre)+(x.rel||x.tel?' ('+[x.rel,x.tel].filter(Boolean).join(', ')+')':''));
+  const j=k=>r.inst.map(i=>sinPref(i[k])).filter(Boolean).join('; ');
+  const cu=k=>r.inst.map(i=>parseImp(i[k])).filter(Boolean).map(eur).join('; ');
+  const ref=r.datos['s referencia']||'';
+  const o={'Número':r.numero,'Asunto':r.asunto||r.numero,'Cliente':cli?cli.nombre.trim():'','Compañero':cli?codDe(cli.nombre):'','Fecha de inicio':r.datos['fecha de inicio']||'','Estado':r.datos['estado del asunto']||'','Su referencia':ref==='0'?'':ref,
+   'Juzgado':j('organismo'),'Nº de procedimiento':j('instancia'),'Tipo de expediente':j('tipo de expediente'),'Cuantía inicial':cu('cuantia inicial'),'Cuantía final':cu('cuantia final'),
+   'Parte contraria':contr.map(con).join('; '),'Letrado contrario':letC.map(con).join('; '),'Procurador':proc.map(con).join('; '),'Abogado':abog.map(x=>sinCod(x.nombre)).join('; '),'Otros intervinientes':otros.join('; ')};
+  o.__acts=r.acts.map(a=>({fecha:a.fecha,hora:a.hora,texto:(a.tipo&&!/^libre$/i.test(a.tipo)?a.tipo+': ':'')+a.desc,importe:a.importe,desc:a.desc||a.tipo}));return o});
+ const nAct=rows.reduce((s,r)=>s+r.__acts.length,0);
+ return{dest:'expedientes',cols:COLS,rows,ocultas:['Abogado'],aviso:`Archivo de expedientes de Microarea: ${rows.length} expedientes con ${nAct} actuaciones.`}}
 async function leerHoja(file){
  if(!window.XLSX)await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
  const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});const ws=wb.Sheets[wb.SheetNames[0]];
  let filas=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,dateNF:'yyyy-mm-dd',blankrows:false});
+ const todas=()=>{for(const n of wb.SheetNames.slice(1))filas=filas.concat(XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:'',raw:false,dateNF:'yyyy-mm-dd',blankrows:false}))};
+ if(esExpedientes(filas)){todas();return leerExpedientes(filas)}
  if(esFichas(filas)){for(const n of wb.SheetNames.slice(1))filas=filas.concat(XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:'',raw:false,dateNF:'yyyy-mm-dd',blankrows:false}));return leerFichas(filas)}
  const hi=filas.findIndex(r=>r.filter(x=>String(x).trim()).length>=2);if(hi<0)throw new Error('El archivo no tiene datos que se puedan leer.');
  const cols=filas[hi].map((h,i)=>String(h).trim()||'Columna '+(i+1));const vistos={};cols.forEach((c,i)=>{if(vistos[c])cols[i]=c+' ('+(++vistos[c])+')';else vistos[c]=1});
@@ -505,19 +551,29 @@ function importar(){const d=IMP.dest,m=Object.assign({},IMP.map),ent=ENTD[d];
  const nuevos=libresImp().filter(x=>x.on);let creados=0;
  if(nuevos.length){const lista=cfgCampos(ent);for(const x of nuevos){const vals=IMP.rows.map(r=>r[x.c]).filter(Boolean);const t=vals.every(v=>toISO(v))?'date':vals.some(v=>v.length>80)?'area':'text';const k=nuevaClave();lista.push({k,l:(x.nombre||x.c).trim(),t,custom:1});m[k]=x.c;creados++}guardarCfg(ent,lista)}
  const cs=impCampos(d),val=(r,k)=>m[k]?String(r[m[k]]??'').trim():'';let n=0,rep=0,nuevosCli=0,sin=0;
- const buscaCli=v=>{const nv=norm(v);if(!nv)return null;return S.clientes.find(c=>(c.nif&&norm(c.nif)===nv)||norm(c.nombre)===nv)||S.clientes.find(c=>Object.keys(c).some(k=>k.startsWith('x_')&&norm(c[k])===nv))};
- const buscaExp=v=>{const nv=norm(v);return S.expedientes.find(e=>norm(e.numero)===nv||(e.autos&&norm(e.autos)===nv))};
+ let act=0,nAct=0,nEv=0;
+ const tok=s=>norm(s).replace(/[^a-z0-9ñ ]/g,' ').split(/\s+/).filter(Boolean).sort().join(' ');
+ const buscaCli=v=>{const nv=norm(v);if(!nv)return null;const tv=tok(v);return S.clientes.find(c=>(c.nif&&norm(c.nif)===nv)||norm(c.nombre)===nv)||S.clientes.find(c=>tok(c.nombre)===tv)||S.clientes.find(c=>Object.keys(c).some(k=>k.startsWith('x_')&&norm(c[k])===nv))||S.clientes.find(c=>tok(sinCod(c.nombre))===tok(sinCod(v)))};
+ const buscaExp=v=>{const nv=norm(v);if(!nv)return null;return S.expedientes.find(e=>norm(e.numero)===nv||(e.autos&&norm(e.autos)===nv))};
+ const fCod=cs.find(f=>f.custom&&nrm2(f.l)==='codigo');
+ const existeCli=o=>(fCod&&o[fCod.k]&&S.clientes.find(c=>norm(c[fCod.k])===norm(o[fCod.k])))||(o.nif&&S.clientes.find(c=>c.nif&&norm(c.nif)===norm(o.nif)))||S.clientes.find(c=>tok(c.nombre)===tok(o.nombre));
+ const pon=(dst,o)=>{for(const k in o)if(o[k]!==''&&o[k]!=null)dst[k]=o[k]};
  for(const r of IMP.rows){const o={};for(const f of cs){o[f.k]=val(r,f.k);if(f.custom&&f.t==='date')o[f.k]=toISO(o[f.k])||o[f.k]}
-  if(d==='clientes'){if(!o.nombre){sin++;continue}if(buscaCli(o.nif||o.nombre)||buscaCli(o.nombre)){rep++;continue}o.tipo=/empres|socied|juridic|\bs\.?[la]\.?\b/i.test(o.tipo)?'Empresa':/particul|fisic/i.test(o.tipo)||!o.tipo?'Particular':o.tipo;S.clientes.push({id:uid(),creado:hoy(),...o});n++}
-  else if(d==='expedientes'){if(!o.asunto&&!o.numero){sin++;continue}if(o.numero&&buscaExp(o.numero)){rep++;continue}
+  if(d==='clientes'){if(!o.nombre){sin++;continue}o.tipo=/empres|socied|juridic|\bs\.?[la]\.?\b/i.test(o.tipo)?'Empresa':/particul|fisic/i.test(o.tipo)||!o.tipo?'Particular':o.tipo;
+   const ex=existeCli(o);if(ex){pon(ex,o);act++;continue}S.clientes.push({id:uid(),creado:hoy(),...o});n++}
+  else if(d==='expedientes'){if(!o.asunto&&!o.numero){sin++;continue}
    let c=o.clienteId?buscaCli(o.clienteId):null;if(!c&&o.clienteId){c={id:uid(),creado:hoy(),nombre:o.clienteId,tipo:'Particular'};S.clientes.push(c);nuevosCli++}
-   o.clienteId=c?c.id:'';o.asunto=o.asunto||o.numero;o.numero=o.numero||sigExp();o.apertura=toISO(o.apertura);o.estado=/archiv|cerrad|baja|finaliz|terminad/i.test(o.estado)?'Archivado':'Abierto';o.materia=o.materia?cap(o.materia.toLowerCase()):'';
-   S.expedientes.push({id:uid(),actuaciones:[],...o});n++}
+   o.clienteId=c?c.id:'';o.apertura=toISO(o.apertura);o.estado=/archiv|cerrad|baja|finaliz|terminad/i.test(o.estado)?'Archivado':'Abierto';o.materia=o.materia?cap(o.materia.toLowerCase()):'';
+   let e=o.numero?buscaExp(o.numero):null;
+   if(e){pon(e,o);act++}else{o.asunto=o.asunto||o.numero;o.numero=o.numero||sigExp();e={id:uid(),actuaciones:[],...o};S.expedientes.push(e);n++}
+   if(r.__acts){e.actuaciones=e.actuaciones||[];const ya=new Set(e.actuaciones.map(a=>a.fecha+'|'+a.texto)),h0=hoy();
+    for(const a of r.__acts){const key=a.fecha+'|'+a.texto;if(!ya.has(key)){const na={id:uid(),fecha:a.fecha,texto:a.texto};if(a.hora)na.hora=a.hora;if(a.importe)na.importe=a.importe;e.actuaciones.push(na);ya.add(key);nAct++}
+     if(a.fecha>=h0&&!S.eventos.some(x=>x.expedienteId===e.id&&x.fecha===a.fecha&&x.titulo===a.desc)){S.eventos.push({id:uid(),hecho:false,tipo:a.hora?'Señalamiento':'Tarea',titulo:a.desc,fecha:a.fecha,hora:a.hora||'',lugar:'',notas:'',expedienteId:e.id});nEv++}}}}
   else{o.fecha=toISO(o.fecha);if(!o.fecha||!(o.titulo||o.tipo)){sin++;continue}const x=o.expedienteId?buscaExp(o.expedienteId):null;o.expedienteId=x?x.id:'';
    const tp=TIPOS_EV.find(t=>norm(o.tipo).includes(norm(t).slice(0,5)));o.titulo=o.titulo||o.tipo;o.tipo=tp||(o.tipo?cap(o.tipo):'Plazo');const hm=String(o.hora).match(/(\d{1,2}):(\d{2})/);o.hora=hm?hm[1].padStart(2,'0')+':'+hm[2]:'';
    S.eventos.push({id:uid(),hecho:false,...o});n++}}
  save();Object.assign(IMP,{cols:[],rows:[],map:{},nombre:'',nuevos:{},ocultas:[],aviso:''});render();
- toast(`Importados ${n}.`+(creados?` Añadidos ${creados} datos nuevos a la ficha.`:'')+(rep?` ${rep} ya existían y se han saltado.`:'')+(sin?` ${sin} filas sin datos suficientes.`:'')+(nuevosCli?` Se han creado ${nuevosCli} clientes nuevos.`:''))}
+ toast(`Nuevos: ${n}.`+(act?` Actualizados: ${act}.`:'')+(nAct?` Actuaciones: ${nAct}.`:'')+(nEv?` Añadidos ${nEv} plazos futuros a la agenda.`:'')+(creados?` Añadidos ${creados} datos nuevos a la ficha.`:'')+(rep?` ${rep} ya existían y se han saltado.`:'')+(sin?` ${sin} filas sin datos suficientes.`:'')+(nuevosCli?` Se han creado ${nuevosCli} clientes nuevos.`:''))}
 V.ajustes=()=>{const d=S.ajustes.despacho,a=S.ajustes;
  return cab('Ajustes')+
  sec('Datos del despacho','',`<div class="panel"><p class="nota">Aparecen en la cabecera de las facturas.</p><div class="grid">${[['nombre','Nombre del despacho o del letrado'],['nif','NIF',1],['telefono','Teléfono',1],['direccion','Dirección completa'],['email','Correo electrónico',1],['iban','IBAN para transferencias',1]].map(([k,l,h])=>`<div class="fld${h?' half':''}"><label for="d_${k}">${l}</label><input id="d_${k}" data-d="${k}" value="${esc(d[k])}"></div>`).join('')}
@@ -610,7 +666,7 @@ document.addEventListener('change',async e=>{const t=e.target,c=t.dataset&&t.dat
  else if(c==='impDest'){IMP.dest=t.value;IMP.map=adivinar(IMP.cols,IMP.dest);IMP.nuevos={};render()}
  else if(c==='impMap'){IMP.map[t.dataset.k]=t.value;render()}
  else if(c==='impNOn'||c==='impNNom'){const i=+t.dataset.i;const n=IMP.nuevos[i]||{on:!IMP.ocultas.includes(IMP.cols[i]),nombre:IMP.cols[i]};if(c==='impNOn')n.on=t.checked;else n.nombre=t.value.trim()||IMP.cols[i];IMP.nuevos[i]=n}
- else if(c==='impFile'){const f=t.files[0];if(!f)return;toast('Leyendo el archivo…');try{const r=await leerHoja(f);Object.assign(IMP,{cols:r.cols,rows:r.rows,nombre:f.name,map:adivinar(r.cols,IMP.dest),nuevos:{},ocultas:r.ocultas||[],aviso:r.aviso||''});render()}catch(err){toast(err.message||'No se ha podido leer el archivo.')}}
+ else if(c==='impFile'){const f=t.files[0];if(!f)return;toast('Leyendo el archivo…');try{const r=await leerHoja(f);if(r.dest)IMP.dest=r.dest;Object.assign(IMP,{cols:r.cols,rows:r.rows,nombre:f.name,map:adivinar(r.cols,IMP.dest),nuevos:{},ocultas:r.ocultas||[],aviso:r.aviso||''});render()}catch(err){toast(err.message||'No se ha podido leer el archivo.')}}
  else if(c==='restaurar'){const f=t.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.clientes))throw 0;if(!confirm(`La copia tiene ${d.clientes.length} clientes y ${(d.expedientes||[]).length} expedientes. Sustituirá todos los datos actuales${fbOk&&usuario?', también en la nube':''}. ¿Continuar?`))return;S=normalizar(d);save();render();toast('Copia recuperada')}catch(err){toast('Ese archivo no es una copia de esta app.')}}});
 
 /* ---------- Arranque ---------- */
