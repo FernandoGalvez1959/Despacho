@@ -165,6 +165,11 @@ body.sin-sesion main{margin:0 auto}
 .row.cli{padding:11px 16px}
 .abog{flex:none;max-width:38%;font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nasu{flex:none;min-width:34px;height:30px;padding:0 10px;font-size:14px;white-space:nowrap;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;justify-content:center}
+.nasu .corto{display:none}
+@media (max-width:560px){.nasu .largo{display:none}.nasu .corto{display:inline;margin-right:3px}}
+.orden{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.orden .chips{margin-bottom:12px}.orden .nota{margin-bottom:12px}
+.mes .cnt{font-weight:400;font-size:13px}
 #print{display:none}
 @media print{
  .app,#toast,dialog{display:none!important}
@@ -300,6 +305,7 @@ const F={
   {k:'nombre',l:'Nombre y apellidos o razón social',req:1},
   {k:'tipo',l:'Tipo',t:'select',o:['Particular','Empresa'],half:1},
   {k:'nif',l:'NIF o CIF',half:1},
+  {k:'letrado',l:'Letrado',t:'companero'},
   {k:'telefono',l:'Teléfono 1',t:'tel',half:1},
   {k:'telefono2',l:'Teléfono 2',t:'tel',half:1},
   {k:'telefono3',l:'Teléfono 3',t:'tel',half:1},
@@ -348,7 +354,7 @@ function campo(f,v){const id='f_'+f.k;v=v??'';let inp;
 /* ---------- Datos configurables de las fichas ---------- */
 const ENT={cliente:'Clientes',expediente:'Expedientes',evento:'Plazos y citas'};
 const TIPOS_CAMPO=[['text','Texto'],['area','Texto largo'],['date','Fecha'],['number','Número'],['tel','Teléfono'],['email','Correo electrónico'],['select','Lista de opciones']];
-const nomTipo=f=>f.t==='cliente'?'Cliente':f.t==='expediente'?'Expediente':f.t==='companero'?'Lista de compañeros':(TIPOS_CAMPO.find(x=>x[0]===(f.t||'text'))||[0,'Texto'])[1];
+const nomTipo=f=>f.t==='cliente'?'Cliente':f.t==='expediente'?'Expediente':f.t==='companero'?'Lista de letrados':(TIPOS_CAMPO.find(x=>x[0]===(f.t||'text'))||[0,'Texto'])[1];
 function cfgCampos(ent){const base=F[ent],cfg=(S.ajustes.campos||{})[ent];if(!cfg)return base.map(f=>({...f}));const out=[];
  for(const c of cfg){const b=base.find(f=>f.k===c.k);if(b)out.push({...b,l:c.l||b.l,oculto:!!c.oculto&&!b.req});else if(c.custom)out.push({k:c.k,l:c.l,t:c.t||'text',o:c.o,custom:1,oculto:!!c.oculto,half:['date','number','tel','select'].includes(c.t)?1:0})}
  base.forEach((b,bi)=>{if(out.some(f=>f.k===b.k))return;let pos=-1;for(let j=bi-1;j>=0&&pos<0;j--)pos=out.findIndex(f=>f.k===base[j].k);out.splice(pos+1,0,{...b})});return out}
@@ -375,7 +381,7 @@ const volver=(h,l)=>`<a class="volver" href="${h}">‹ ${l}</a>`;
 const cab=(t,acc='',sub='')=>`<div class="top"><div class="tit"><h1>${esc(t)}</h1>${sub?`<p class="sub">${sub}</p>`:''}</div><div class="acc">${acc}</div></div>`;
 const sec=(t,acc,cuerpo)=>`<div class="sechead"><h2>${t}</h2>${acc||''}</div>${cuerpo}`;
 const noEnc=(h,l)=>volver(h,l)+vacio('Este registro ya no existe.');
-const Q={},FL={exp:'Abierto',ag:'pend',fac:'pend',cli:'abiertos'};
+const Q={},FL={exp:'Abierto',ag:'pend',fac:'pend',cli:'abiertos',ord:'nombre'};
 const buscador=(k,ph)=>`<input class="buscar" type="search" data-q="${k}" value="${esc(Q[k]||'')}" placeholder="${ph}" aria-label="${ph}">`;
 const chips=(k,ops)=>`<div class="chips">${ops.map(([v,l,n])=>`<button type="button" class="chip${FL[k]===v?' on':''}" data-a="filtro" data-k="${k}" data-v="${v}">${l}${n!==undefined?` <span class="cnt">${n.toLocaleString('es-ES')}</span>`:''}</button>`).join('')}</div>`;
 function datos(pares,todos){const p=todos?pares:pares.filter(x=>x[1]);if(!p.length)return '';return `<dl class="panel datos">${p.map(([l,v,html,ancho])=>`<div${ancho?' class="ancho"':''}><dt>${esc(l)}</dt><dd>${html?v:esc(v)}</dd></div>`).join('')}</dl>`}
@@ -402,10 +408,13 @@ function apellidosPrimero(n){n=String(n||'').trim();if(!n||n.includes(','))retur
  let i=t.findIndex(x=>CLAVE.test(x));
  if(i<0){let k=t.length,u=0;while(u<2&&k>1){k--;while(k>1&&PART.includes(norm(t[k-1])))k--;u++}i=k}
  if(i<=0||i>=t.length)return n;return t.slice(i).join(' ')+', '+t.slice(0,i).join(' ')}
+function migrar13(){const a=S.ajustes;if(a.migr>=13)return false;
+ for(const c of S.clientes){if(c.letrado)continue;const s=new Set(S.expedientes.filter(e=>e.clienteId===c.id&&abierto(e)&&e.companero).map(e=>e.companero));if(s.size===1)c.letrado=[...s][0]}
+ a.migr=13;return true}
 function migrar12(){const a=S.ajustes;if(a.migr>=12)return false;
  const l=cfgCampos('cliente');for(const f of l){if(['telefono3','telefono4','telefono5'].includes(f.k))f.oculto=true;if(f.custom&&(nrm2(f.l)==='codigo'||/expedient|asunto/.test(nrm2(f.l))))f.oculto=true}guardarCfg('cliente',l);
  for(const c of S.clientes){const extra=['telefono3','telefono4','telefono5'].map(k=>c[k]).filter(Boolean);if(extra.length){const dest=c.telefono2?'telefono2':c.telefono?'telefono2':'telefono';c[dest]=[c[dest],...extra].filter(Boolean).join('; ')}delete c.telefono3;delete c.telefono4;delete c.telefono5}
- a.migr=12;return true}
+ a.migr=12;migrar13();return true}
 function migrar11(){const a=S.ajustes;if(a.migr>=11)return false;
  const cfg=(a.campos&&a.campos.expediente)||[],fuera=cfg.filter(c=>c.custom&&nrm2(c.l)==='companero').map(c=>c.k);
  if(fuera.length){guardarCfg('expediente',cfgCampos('expediente').filter(f=>!fuera.includes(f.k)));for(const e of S.expedientes)for(const k of fuera)delete e[k]}
@@ -415,7 +424,7 @@ function migrar9(){const a=S.ajustes;if(a.migr>=9)return false;
  for(const e of S.expedientes)if(e.estado==='Archiv'+'ado')e.estado='Cerrado';
  for(const c of S.clientes)if(c.tipo!=='Empresa')c.nombre=apellidosPrimero(c.nombre);
  a.migr=9;migrar10();return true}
-function migrar(){const a=S.ajustes;if(a.migr>=11)return migrar12();if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
+function migrar(){const a=S.ajustes;if(a.migr>=12)return migrar13();if(a.migr>=11)return migrar12();if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
  const quitar=s=>{const n=nrm2(s);return ['banco','iban','bic','entidad','sucursal','dc','cuenta','cuenta contable','cuenta p g c','forma pago','forma de pago','portes','transportista','direccion de envio'].includes(n)||n.includes('envio')||n.includes('bancari')};
  const fuera=((a.campos&&a.campos.cliente)||[]).filter(c=>c.custom&&quitar(c.l)).map(c=>c.k);
  const lista=cfgCampos('cliente').filter(f=>!fuera.includes(f.k));
@@ -453,9 +462,13 @@ const filtroCli=(c,m)=>{const x=m[c.id];return FL.cli==='todos'||(FL.cli==='abie
 L.clientes=()=>{if(!S.clientes.length)return vacio('Todavía no hay clientes. Pulsa «Nuevo cliente» o importa los tuyos desde Ajustes.');
  const q=norm(Q.clientes),m=estadoCli();const l=S.clientes.filter(c=>filtroCli(c,m)).filter(c=>!q||textoBusq(c).includes(q)).sort(cmpNom);
  if(!l.length)return vacio(Q.clientes?'Ningún cliente coincide con la búsqueda.':'No hay clientes en este apartado.');
- return `<div class="list">${l.map(c=>{const x=m[c.id]||{ab:0,ce:0};return `<a class="row cli" href="#cliente/${c.id}"><div class="txt"><div class="t">${esc(c.nombre)}</div></div><span class="nasu">Expedientes abiertos: ${x.ab}</span></a>`}).join('')}</div>`};
+ const fila=(c,conLet)=>{const x=m[c.id]||{ab:0,ce:0};return `<a class="row cli" href="#cliente/${c.id}"><div class="txt"><div class="t">${esc(c.nombre)}</div>${conLet?`<div class="s">${c.letrado?esc(c.letrado):'Sin letrado'}</div>`:''}</div><span class="nasu"><span class="largo">Expedientes abiertos: </span><span class="corto">EA </span>${x.ab}</span></a>`};
+ if(FL.ord!=='letrado')return `<div class="list">${l.map(c=>fila(c,1)).join('')}</div>`;
+ const grupos={};for(const c of l)(grupos[c.letrado||'']=grupos[c.letrado||'']||[]).push(c);
+ const orden=Object.keys(grupos).sort((a,b)=>(!a)-(!b)||a.localeCompare(b,'es'));
+ return orden.map(k=>`<h3 class="mes">${k?esc(k):'Sin letrado asignado'} <span class="cnt">${grupos[k].length}</span></h3><div class="list">${grupos[k].map(c=>fila(c,0)).join('')}</div>`).join('')};
 V.clientes=()=>{const m=estadoCli(),ab=S.clientes.filter(c=>m[c.id]&&m[c.id].ab).length,ce=S.clientes.filter(c=>m[c.id]&&!m[c.id].ab&&m[c.id].ce).length;
- return cab('Clientes',`<button class="btn pri" data-a="nuevoCli">Nuevo cliente</button>`)+chips('cli',[['abiertos','Con expedientes abiertos',ab],['cerrados','Solo cerrados',ce],['todos','Todos',S.clientes.length]])+buscador('clientes','Buscar por nombre, NIF, teléfono…')+`<div id="lst">${L.clientes()}</div>`};
+ return cab('Clientes',`<button class="btn pri" data-a="nuevoCli">Nuevo cliente</button>`)+chips('cli',[['abiertos','Con expedientes abiertos',ab],['cerrados','Solo cerrados',ce],['todos','Todos',S.clientes.length]])+`<div class="orden"><span class="nota">Ordenar por</span>${chips('ord',[['nombre','Nombre'],['letrado','Letrado']])}</div>`+buscador('clientes','Buscar por nombre, NIF, teléfono, letrado…')+`<div id="lst">${L.clientes()}</div>`};
 const VER_EC={};
 V.cliente=id=>{const c=byId('clientes',id);if(!c)return noEnc('#clientes','Clientes');const todos=expDeCli(id),ex=todos.filter(abierto),ce=todos.filter(e=>!abierto(e));
  return volver('#clientes','Clientes')+cab(c.nombre,`<button class="btn" data-a="editCli" data-id="${id}">Editar</button><button class="btn ghost dan" data-a="delCli" data-id="${id}">Borrar</button>`)+
@@ -511,7 +524,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='12';
+const VERSION='13';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -629,7 +642,7 @@ V.ajustes=()=>{const d=S.ajustes.despacho,a=S.ajustes;
  return cab('Ajustes')+
  sec('Datos del despacho','',`<div class="panel"><p class="nota">Aparecen en la cabecera de las facturas.</p><div class="grid">${[['nombre','Nombre del despacho o del letrado'],['nif','NIF',1],['telefono','Teléfono',1],['direccion','Dirección completa'],['email','Correo electrónico',1],['iban','IBAN para transferencias',1]].map(([k,l,h])=>`<div class="fld${h?' half':''}"><label for="d_${k}">${l}</label><input id="d_${k}" data-d="${k}" value="${esc(d[k])}"></div>`).join('')}
  <div class="fld half"><label for="a_serie">Serie de facturas</label><input id="a_serie" value="${esc(a.serie)}" placeholder="Ej.: F"></div><div class="fld half"><label for="a_iva">IVA por defecto (%)</label><input id="a_iva" inputmode="decimal" value="${esc(a.iva)}"></div><div class="fld half"><label for="a_irpf">Retención IRPF por defecto (%)</label><input id="a_irpf" inputmode="decimal" value="${esc(a.irpf)}"></div></div><button class="btn pri" data-a="guardarAj">Guardar datos</button></div>`)+
- sec('Compañeros','',companerosHTML())+
+ sec('Letrados','',companerosHTML())+
  sec('Datos de las fichas','',camposHTML())+
  sec('Importar datos','',importHTML())+
  sec('Copia de seguridad','',`<div class="panel"><p>Descarga un archivo con todos tus datos o recupera una copia anterior.</p><div class="rapidos"><button class="btn" data-a="exportar">Descargar copia</button><label class="btn">Recuperar copia<input type="file" accept=".json,application/json" data-c="restaurar" hidden></label></div></div>`)+
@@ -638,7 +651,7 @@ V.ajustes=()=>{const d=S.ajustes.despacho,a=S.ajustes;
  `<p class="nota pie">Versión ${VERSION}. ${S.clientes.length} clientes, ${S.expedientes.length} expedientes, ${S.eventos.length} plazos y citas, ${S.facturas.length} facturas.</p>`};
 
 function companerosHTML(){const l=S.ajustes.companeros||[];
- return `<div class="panel"><p class="nota">Nombres de los compañeros que tramitan expedientes. Luego, en cada expediente, eliges uno en «Compañero que lo tramita».</p>${l.length?`<div class="list" style="margin-bottom:12px">${l.map((n,i)=>`<div class="row"><div class="txt"><div class="t">${esc(n)}</div></div><button type="button" class="btn sm ghost dan" data-a="quitaComp" data-i="${i}">Quitar</button></div>`).join('')}</div>`:''}<div class="addact" style="grid-template-columns:1fr auto"><input id="nuevoComp" placeholder="Nombre y apellidos" aria-label="Nombre del compañero"><button class="btn pri" data-a="addComp">Añadir</button></div></div>`}
+ return `<div class="panel"><p class="nota">Letrados que tramitan los asuntos. Asigna uno a cada cliente en su ficha («Editar» › Letrado) y se aplicará a todos sus expedientes abiertos. También puedes cambiarlo en un expediente concreto.</p>${l.length?`<div class="list" style="margin-bottom:12px">${l.map((n,i)=>`<div class="row"><div class="txt"><div class="t">${esc(n)}</div></div><button type="button" class="btn sm ghost dan" data-a="quitaComp" data-i="${i}">Quitar</button></div>`).join('')}</div>`:''}<div class="addact" style="grid-template-columns:1fr auto"><input id="nuevoComp" placeholder="Nombre y apellidos" aria-label="Nombre del compañero"><button class="btn pri" data-a="addComp">Añadir</button></div></div>`}
 let CE='cliente';
 function camposHTML(){const l=cfgCampos(CE);return `<div class="panel"><p class="nota">Elige qué datos tiene cada ficha, cómo se llaman y en qué orden aparecen.</p><div class="chips">${Object.entries(ENT).map(([k,n])=>`<button type="button" class="chip${CE===k?' on':''}" data-a="ce" data-v="${k}">${n}</button>`).join('')}</div>
  <div class="list">${l.map((f,i)=>`<div class="row campo${f.oculto?' is-oculto':''}"><div class="txt"><div class="t">${esc(f.l)}${f.oculto?' <span class="tag">Oculto</span>':''}</div><div class="s">${esc(nomTipo(f))}${f.custom?', añadido por ti':''}${f.req?', obligatorio':''}</div></div><button type="button" class="btn sm ghost" data-a="subeCampo" data-i="${i}" aria-label="Subir ${esc(f.l)}"${i?'':' disabled'}>↑</button><button type="button" class="btn sm ghost" data-a="bajaCampo" data-i="${i}" aria-label="Bajar ${esc(f.l)}"${i<l.length-1?'':' disabled'}>↓</button><button type="button" class="btn sm" data-a="editCampo" data-i="${i}">Editar</button></div>`).join('')}</div>
@@ -675,11 +688,12 @@ const ACT={
  cerrar:()=>dlg.close(),
  filtro:(id,b)=>{FL[b.dataset.k]=b.dataset.v;render()},
  nuevoCli:()=>formModal('Nuevo cliente',campos('cliente'),{tipo:'Particular'},v=>{const c={id:uid(),creado:hoy(),...v};S.clientes.push(c);location.hash='#cliente/'+c.id}),
- editCli:id=>{const c=byId('clientes',id);formModal('Editar cliente',campos('cliente'),c,v=>{Object.assign(c,v)})},
+ editCli:id=>{const c=byId('clientes',id),antes=c.letrado||'';formModal('Editar cliente',campos('cliente'),c,v=>{Object.assign(c,v);
+  if(v.letrado!==undefined&&v.letrado!==antes&&v.letrado){const ab=S.expedientes.filter(e=>e.clienteId===c.id&&abierto(e));ab.forEach(e=>e.companero=v.letrado);if(ab.length)toast(`Letrado asignado también a ${ab.length} expediente${ab.length>1?'s':''} abierto${ab.length>1?'s':''}`)}})},
  delCli:id=>{const n=S.expedientes.filter(e=>e.clienteId===id).length,nf=S.facturas.filter(f=>f.clienteId===id).length;
   if(n||nf){alert(`Este cliente tiene ${n} expedientes y ${nf} facturas. Bórralos antes o pásalos a otro cliente.`);return}
   if(confirm('¿Borrar este cliente?')){S.clientes=S.clientes.filter(c=>c.id!==id);save();go('#clientes');toast('Cliente borrado')}},
- nuevoExp:(id,b)=>{if(faltaCliente())return;formModal('Nuevo expediente',campos('expediente'),{clienteId:b.dataset.cli||'',apertura:hoy(),estado:'Abierto',materia:''},v=>{const e={id:uid(),actuaciones:[],...v};if(!e.numero)e.numero=sigExp();S.expedientes.push(e);location.hash='#expediente/'+e.id})},
+ nuevoExp:(id,b)=>{if(faltaCliente())return;formModal('Nuevo expediente',campos('expediente'),{clienteId:b.dataset.cli||'',apertura:hoy(),estado:'Abierto',materia:''},v=>{const e={id:uid(),actuaciones:[],...v};if(!e.numero)e.numero=sigExp();if(!e.companero){const c=byId('clientes',e.clienteId);if(c&&c.letrado)e.companero=c.letrado}S.expedientes.push(e);location.hash='#expediente/'+e.id})},
  editExp:id=>{const e=byId('expedientes',id);formModal('Editar expediente',campos('expediente'),e,v=>{if(!v.numero)v.numero=e.numero||sigExp();Object.assign(e,v)})},
  delExp:id=>{const ne=S.eventos.filter(x=>x.expedienteId===id).length;if(!confirm(`¿Borrar este expediente?${ne?` Se borrarán también sus ${ne} plazos y citas.`:''} Las facturas se conservan.`))return;
   S.expedientes=S.expedientes.filter(e=>e.id!==id);S.eventos=S.eventos.filter(x=>x.expedienteId!==id);S.facturas.forEach(f=>{if(f.expedienteId===id)f.expedienteId=''});save();go('#expedientes');toast('Expediente borrado')},
@@ -699,7 +713,7 @@ const ACT={
  ce:(id,b)=>{CE=b.dataset.v;render()},
  verEC:id=>{VER_EC[id]=!VER_EC[id];render()},
  addComp:()=>{const v=$('#nuevoComp').value.trim();if(!v){$('#nuevoComp').focus();return}const l=[...(S.ajustes.companeros||[])];if(l.some(x=>norm(x)===norm(v))){toast('Ese nombre ya está en la lista');return}l.push(v);l.sort((a,b)=>a.localeCompare(b,'es'));S.ajustes.companeros=l;save();render();toast('Compañero añadido')},
- quitaComp:(id,b)=>{const l=[...(S.ajustes.companeros||[])],n=l[+b.dataset.i];const u=S.expedientes.filter(e=>e.companero===n).length;if(!confirm(`¿Quitar a ${n} de la lista?${u?` Tiene ${u} expedientes asignados, que quedarán sin asignar.`:''}`))return;l.splice(+b.dataset.i,1);S.ajustes.companeros=l;S.expedientes.forEach(e=>{if(e.companero===n)e.companero=''});save();render()},
+ quitaComp:(id,b)=>{const l=[...(S.ajustes.companeros||[])],n=l[+b.dataset.i];const u=S.expedientes.filter(e=>e.companero===n).length,uc=S.clientes.filter(c=>c.letrado===n).length;if(!confirm(`¿Quitar a ${n} de la lista?${u||uc?` Tiene ${uc} clientes y ${u} expedientes asignados, que quedarán sin asignar.`:''}`))return;l.splice(+b.dataset.i,1);S.ajustes.companeros=l;S.expedientes.forEach(e=>{if(e.companero===n)e.companero=''});S.clientes.forEach(c=>{if(c.letrado===n)c.letrado=''});save();render()},
  subeCampo:(id,b)=>moverCampo(+b.dataset.i,-1),
  bajaCampo:(id,b)=>moverCampo(+b.dataset.i,1),
  nuevoCampo:()=>formModal('Añadir dato a '+ENT[CE].toLowerCase(),defCampoNuevo,{tipo:'Texto'},v=>{const l=cfgCampos(CE),f={k:nuevaClave(),l:v.l,custom:1};aplicarTipo(f,v);l.push(f);guardarCfg(CE,l);toast('Dato añadido')}),
