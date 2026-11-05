@@ -91,10 +91,13 @@ a.row:hover,.row .txt[data-a]:hover .t{color:var(--accent)}
 .aviso h2{margin-bottom:6px}.aviso p{margin:0}
 .cobro{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;text-decoration:none;color:inherit}
 .importe{font-size:30px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
-.datos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px 18px;margin:0;padding:14px 16px}
+.datos{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px 16px;margin:0;padding:12px 14px}
 .datos dt{font-size:12.5px;color:var(--muted)}
 .datos dd{margin:1px 0 0;font-size:15.5px;white-space:pre-wrap;overflow-wrap:anywhere}
 .datos .nd{color:var(--muted)}
+.datos .ea{font-weight:600;color:var(--accent)}
+.lnk{border:0;background:none;padding:0;font:inherit;font-weight:600;color:var(--danger);cursor:pointer;min-height:0}
+.lnk:hover{text-decoration:underline}
 .datos .ancho{grid-column:1/-1}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 .fld{grid-column:1/-1;margin-bottom:12px}
@@ -380,9 +383,12 @@ function datos(pares,todos){const p=todos?pares:pares.filter(x=>x[1]);if(!p.leng
 function telHTML(v){return esc(v).replace(/\+?\d[\d\s.-]{5,}\d/g,m=>`<a href="tel:${m.replace(/[\s.-]/g,'')}">${m}</a>`)}
 const ND='<span class="nd">—</span>';
 function ficha(ent,o,saltar=[]){const cs=campos(ent).filter(f=>!saltar.includes(f.k)&&f.t!=='cliente'&&f.t!=='expediente');const pares=[],hechos=new Set();
+ if(ent==='cliente'){const l=S.expedientes.filter(e=>e.clienteId===o.id),ea=l.filter(abierto).length,ec=l.length-ea;
+  pares.push(['EA',`<span class="ea">${ea}</span>`,1]);
+  pares.push(['EC',ec?`<button type="button" class="lnk ec" data-a="verEC" data-id="${o.id}" aria-expanded="${!!VER_EC[o.id]}">${ec} ${VER_EC[o.id]?'▴':'▾'}</button>`:'0',1])}
  for(const f of cs){const g=/^telefono\d?$/.test(f.k)?'tel':/^email\d?$/.test(f.k)?'mail':'';
-  if(g){if(hechos.has(g))continue;hechos.add(g);const vs=cs.filter(x=>(g==='tel'?/^telefono\d?$/:/^email\d?$/).test(x.k)).map(x=>o[x.k]).filter(Boolean);
-   pares.push([g==='tel'?'Teléfonos':'Correos',vs.length?vs.map(v=>`<div>${g==='tel'?telHTML(v):`<a href="mailto:${esc(v)}">${esc(v)}</a>`}</div>`).join(''):ND,1,1]);continue}
+  if(g){if(hechos.has(g))continue;hechos.add(g);const vs=cs.filter(x=>(g==='tel'?/^telefono\d?$/:/^email\d?$/).test(x.k)).map(x=>o[x.k]).filter(Boolean).flatMap(v=>String(v).split(/\s*;\s*/)).filter(Boolean);
+   pares.push([g==='tel'?'Teléfonos':'Correos',vs.length?vs.map(v=>`<div>${g==='tel'?telHTML(v):`<a href="mailto:${esc(v)}">${esc(v)}</a>`}</div>`).join(''):ND,1,vs.some(v=>String(v).length>24)]);continue}
   if(ent==='cliente'&&f.custom&&/expedient|asunto/.test(nrm2(f.l))){const ab=S.expedientes.filter(e=>e.clienteId===o.id&&abierto(e));pares.push(['Expedientes abiertos',String(ab.length)]);continue}
   const v=o[f.k];if(v===undefined||v===null||v===''){pares.push([f.l,ND,1,f.t==='area']);continue}
   if(f.t==='tel')pares.push([f.l,telHTML(v),1,String(v).length>28]);
@@ -396,16 +402,20 @@ function apellidosPrimero(n){n=String(n||'').trim();if(!n||n.includes(','))retur
  let i=t.findIndex(x=>CLAVE.test(x));
  if(i<0){let k=t.length,u=0;while(u<2&&k>1){k--;while(k>1&&PART.includes(norm(t[k-1])))k--;u++}i=k}
  if(i<=0||i>=t.length)return n;return t.slice(i).join(' ')+', '+t.slice(0,i).join(' ')}
+function migrar12(){const a=S.ajustes;if(a.migr>=12)return false;
+ const l=cfgCampos('cliente');for(const f of l){if(['telefono3','telefono4','telefono5'].includes(f.k))f.oculto=true;if(f.custom&&(nrm2(f.l)==='codigo'||/expedient|asunto/.test(nrm2(f.l))))f.oculto=true}guardarCfg('cliente',l);
+ for(const c of S.clientes){const extra=['telefono3','telefono4','telefono5'].map(k=>c[k]).filter(Boolean);if(extra.length){const dest=c.telefono2?'telefono2':c.telefono?'telefono2':'telefono';c[dest]=[c[dest],...extra].filter(Boolean).join('; ')}delete c.telefono3;delete c.telefono4;delete c.telefono5}
+ a.migr=12;return true}
 function migrar11(){const a=S.ajustes;if(a.migr>=11)return false;
  const cfg=(a.campos&&a.campos.expediente)||[],fuera=cfg.filter(c=>c.custom&&nrm2(c.l)==='companero').map(c=>c.k);
  if(fuera.length){guardarCfg('expediente',cfgCampos('expediente').filter(f=>!fuera.includes(f.k)));for(const e of S.expedientes)for(const k of fuera)delete e[k]}
- delete a.claves;for(const e of S.expedientes)if(e.juzgado)e.juzgado=limpiaJuzgado(e.juzgado);a.migr=11;return true}
+ delete a.claves;for(const e of S.expedientes)if(e.juzgado)e.juzgado=limpiaJuzgado(e.juzgado);a.migr=11;migrar12();return true}
 function migrar10(){const a=S.ajustes;if(a.migr>=10)return false;for(const e of S.expedientes)if(e.juzgado)e.juzgado=limpiaJuzgado(e.juzgado);a.migr=10;migrar11();return true}
 function migrar9(){const a=S.ajustes;if(a.migr>=9)return false;
  for(const e of S.expedientes)if(e.estado==='Archiv'+'ado')e.estado='Cerrado';
  for(const c of S.clientes)if(c.tipo!=='Empresa')c.nombre=apellidosPrimero(c.nombre);
  a.migr=9;migrar10();return true}
-function migrar(){const a=S.ajustes;if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
+function migrar(){const a=S.ajustes;if(a.migr>=11)return migrar12();if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
  const quitar=s=>{const n=nrm2(s);return ['banco','iban','bic','entidad','sucursal','dc','cuenta','cuenta contable','cuenta p g c','forma pago','forma de pago','portes','transportista','direccion de envio'].includes(n)||n.includes('envio')||n.includes('bancari')};
  const fuera=((a.campos&&a.campos.cliente)||[]).filter(c=>c.custom&&quitar(c.l)).map(c=>c.k);
  const lista=cfgCampos('cliente').filter(f=>!fuera.includes(f.k));
@@ -446,10 +456,11 @@ L.clientes=()=>{if(!S.clientes.length)return vacio('Todavía no hay clientes. Pu
  return `<div class="list">${l.map(c=>{const x=m[c.id]||{ab:0,ce:0};return `<a class="row cli" href="#cliente/${c.id}"><div class="txt"><div class="t">${esc(c.nombre)}</div></div><span class="nasu">Expedientes abiertos: ${x.ab}</span></a>`}).join('')}</div>`};
 V.clientes=()=>{const m=estadoCli(),ab=S.clientes.filter(c=>m[c.id]&&m[c.id].ab).length,ce=S.clientes.filter(c=>m[c.id]&&!m[c.id].ab&&m[c.id].ce).length;
  return cab('Clientes',`<button class="btn pri" data-a="nuevoCli">Nuevo cliente</button>`)+chips('cli',[['abiertos','Con expedientes abiertos',ab],['cerrados','Solo cerrados',ce],['todos','Todos',S.clientes.length]])+buscador('clientes','Buscar por nombre, NIF, teléfono…')+`<div id="lst">${L.clientes()}</div>`};
-V.cliente=id=>{const c=byId('clientes',id);if(!c)return noEnc('#clientes','Clientes');const ex=expDeCli(id);
+const VER_EC={};
+V.cliente=id=>{const c=byId('clientes',id);if(!c)return noEnc('#clientes','Clientes');const todos=expDeCli(id),ex=todos.filter(abierto),ce=todos.filter(e=>!abierto(e));
  return volver('#clientes','Clientes')+cab(c.nombre,`<button class="btn" data-a="editCli" data-id="${id}">Editar</button><button class="btn ghost dan" data-a="delCli" data-id="${id}">Borrar</button>`)+
  ficha('cliente',c,['nombre'])+
- sec('Expedientes',`<button class="btn sm" data-a="nuevoExp" data-cli="${id}">Nuevo expediente</button>`,ex.length?`<div class="list">${ex.map(expRowCli).join('')}</div>`:vacio('Sin expedientes.'))+
+ sec('Expedientes',`<button class="btn sm" data-a="nuevoExp" data-cli="${id}">Nuevo expediente</button>`,(ex.length?`<div class="list">${ex.map(expRowCli).join('')}</div>`:vacio('Sin expedientes abiertos.'))+(VER_EC[id]&&ce.length?`<h3 class="mes">Cerrados</h3><div class="list">${ce.map(expRowCli).join('')}</div>`:''))+
  sec('Pagos pendientes','',vacio('Este apartado se preparará más adelante.'))};
 
 L.expedientes=()=>{if(!S.expedientes.length)return vacio('Todavía no hay expedientes. Pulsa «Nuevo expediente» o impórtalos desde Ajustes.');
@@ -488,7 +499,7 @@ V.factura=id=>{const f=byId('facturas',id);if(!f)return noEnc('#facturas','Factu
 /* ---------- Ajustes e importación ---------- */
 const IMP={dest:'clientes',cols:[],rows:[],map:{},nombre:'',nuevos:{},ocultas:[],aviso:''};
 const ENTD={clientes:'cliente',expedientes:'expediente',eventos:'evento'};
-const impCampos=d=>campos(ENTD[d]);
+const impCampos=d=>cfgCampos(ENTD[d]);
 function libresImp(){const usadas=new Set(Object.values(IMP.map).filter(Boolean));return IMP.cols.map((c,i)=>({c,i,...(IMP.nuevos[i]||{on:!IMP.ocultas.includes(c),nombre:c})})).filter(x=>!usadas.has(x.c)&&IMP.rows.some(r=>r[x.c]))}
 const ejemplo=c=>{const v=(IMP.rows.find(r=>r[c])||{})[c]||'';return v.length>40?v.slice(0,40)+'…':v};
 const IMPL={clienteId:'Cliente (nombre o NIF)',expedienteId:'Expediente (número o autos)'};
@@ -500,7 +511,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='11';
+const VERSION='12';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -520,7 +531,7 @@ function leerFichas(filas){const recs=[];let cur=null,modo=null,cabs=[],prevLab=
   if(nn.includes('iban')||(nn.includes('banco')&&nn.includes('cuenta'))||nn.includes('portes')||nn.includes('transportista')){modo='ignorar';continue}
   if(modo==='ignorar')continue;
   if(!modo&&pl&&pl.length){fila.forEach((v,x)=>{if(!v)return;const l=pl.find(z=>x>z.i&&x<z.fin);if(l&&!EXCLUIR.includes(l.k))cur[l.k]=((cur[l.k]||'')+' '+v).trim()});continue}
-  if(modo==='tel'){const o=asigna(fila),num=o[cabs[0].n]||'',resto=cabs.slice(1).map(c=>o[c.n]).filter(Boolean).join(', ');const t=num+(resto?' ('+resto+')':'');let n=1;while(n<5&&cur['Teléfono '+n])n++;cur['Teléfono '+n]=cur['Teléfono '+n]?cur['Teléfono '+n]+'; '+t:t;continue}
+  if(modo==='tel'){const o=asigna(fila),num=o[cabs[0].n]||'',resto=cabs.slice(1).map(c=>o[c.n]).filter(Boolean).join(', ');const t=num+(resto?' ('+resto+')':'');let n=1;while(n<2&&cur['Teléfono '+n])n++;cur['Teléfono '+n]=cur['Teléfono '+n]?cur['Teléfono '+n]+'; '+t:t;continue}
 }
  if(cur)recs.push(cur);
  for(const r of recs){const nb=(r['Nombre']||'').trim(),ap=(r['Apellidos']||'').trim();r['Nombre completo']=ap&&nb?ap+', '+nb:(ap||nb||r['Nombre común']||'')}
@@ -686,6 +697,7 @@ const ACT={
  addLinea:()=>{$('#lineas').insertAdjacentHTML('beforeend',lineaHTML({concepto:'',importe:''}));recalc()},
  quitaLinea:(id,b)=>{b.closest('.linea').remove();recalc()},
  ce:(id,b)=>{CE=b.dataset.v;render()},
+ verEC:id=>{VER_EC[id]=!VER_EC[id];render()},
  addComp:()=>{const v=$('#nuevoComp').value.trim();if(!v){$('#nuevoComp').focus();return}const l=[...(S.ajustes.companeros||[])];if(l.some(x=>norm(x)===norm(v))){toast('Ese nombre ya está en la lista');return}l.push(v);l.sort((a,b)=>a.localeCompare(b,'es'));S.ajustes.companeros=l;save();render();toast('Compañero añadido')},
  quitaComp:(id,b)=>{const l=[...(S.ajustes.companeros||[])],n=l[+b.dataset.i];const u=S.expedientes.filter(e=>e.companero===n).length;if(!confirm(`¿Quitar a ${n} de la lista?${u?` Tiene ${u} expedientes asignados, que quedarán sin asignar.`:''}`))return;l.splice(+b.dataset.i,1);S.ajustes.companeros=l;S.expedientes.forEach(e=>{if(e.companero===n)e.companero=''});save();render()},
  subeCampo:(id,b)=>moverCampo(+b.dataset.i,-1),
