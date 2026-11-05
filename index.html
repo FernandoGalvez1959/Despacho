@@ -156,6 +156,12 @@ body.sin-sesion main{margin:0 auto}
 .tl .actimp{font-size:14.5px;font-variant-numeric:tabular-nums;color:var(--ok)}
 .tl .actimp.neg{color:var(--warn)}
 .chip .cnt{font-size:13px;opacity:.75;font-variant-numeric:tabular-nums}
+.row.exp-ab{background:var(--accent-soft)}
+.row.exp-ce{background:var(--danger-soft)}
+.row.exp-ab:hover,.row.exp-ce:hover{filter:brightness(.98)}
+.row.cli{padding:11px 16px}
+.abog{flex:none;max-width:38%;font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nasu{flex:none;min-width:34px;height:30px;padding:0 8px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;justify-content:center}
 #print{display:none}
 @media print{
  .app,#toast,dialog{display:none!important}
@@ -202,41 +208,53 @@ const KEY='despacho_v1';
 const DEF={clientes:[],expedientes:[],eventos:[],facturas:[],ajustes:{despacho:{nombre:'',nif:'',direccion:'',telefono:'',email:'',iban:''},serie:'F',iva:21,irpf:15}};
 const copia=o=>JSON.parse(JSON.stringify(o));
 function normalizar(d){const s=Object.assign(copia(DEF),d||{});s.ajustes=Object.assign(copia(DEF.ajustes),s.ajustes||{});s.ajustes.despacho=Object.assign({},DEF.ajustes.despacho,s.ajustes.despacho||{});for(const k of ['clientes','expedientes','eventos','facturas'])if(!Array.isArray(s[k]))s[k]=[];return s}
-function cargar(){let d=null;try{d=JSON.parse(localStorage.getItem(KEY))}catch(e){}return normalizar(d)}
-let S=cargar();
-function guardarLocal(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('No se han podido guardar los cambios en este dispositivo: el almacenamiento está lleno.')}}
+/* ---------- Almacenamiento en el dispositivo (IndexedDB: mucho más espacio que localStorage) ---------- */
+let S=normalizar(null),cargado=false;
+const IDB={p:null,abrir(){return this.p||(this.p=new Promise((ok,ko)=>{const r=indexedDB.open('despacho',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)}))},
+ async op(modo,f){const db=await this.abrir();return new Promise((ok,ko)=>{const tx=db.transaction('kv',modo),st=tx.objectStore('kv');let res;const rq=f(st);if(rq)rq.onsuccess=()=>{res=rq.result};tx.oncomplete=()=>ok(res);tx.onerror=()=>ko(tx.error);tx.onabort=()=>ko(tx.error)})},
+ get(k){return this.op('readonly',st=>st.get(k))},set(k,v){return this.op('readwrite',st=>st.put(v,k))},del(k){return this.op('readwrite',st=>st.delete(k))}};
+let tGuardar=null,avisoAlm=false;
+function guardarYa(){clearTimeout(tGuardar);tGuardar=null;if(!cargado)return Promise.resolve();return IDB.set('S',S).catch(e=>{if(!avisoAlm){avisoAlm=true;toast('No se han podido guardar los datos en este dispositivo ('+((e&&e.name)||'error')+'). Siguen en la nube.')}})}
+function guardarLocal(){clearTimeout(tGuardar);tGuardar=setTimeout(guardarYa,400)}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){if(tGuardar)guardarYa();guardarPend()}});
+window.addEventListener('pagehide',()=>{if(tGuardar)guardarYa()});
 
 /* ---------- Sincronización con Firebase ---------- */
 const CFG={apiKey:"AIzaSyBMKg2E225ofx7OftgmWxyQ8Iw0pW6bxJA",authDomain:"despacho-acd51.firebaseapp.com",databaseURL:"https://despacho-acd51-default-rtdb.europe-west1.firebasedatabase.app",projectId:"despacho-acd51",storageBucket:"despacho-acd51.firebasestorage.app",messagingSenderId:"626026177345",appId:"1:626026177345:web:0982f91044d8424c9437c0"};
 const KEY_UID='despacho_uid',KEY_CONF='despacho_conf',COLS=['clientes','expedientes','eventos','facturas'];
 let fbOk=false,auth=null,authListo=false,usuario=null,listo=true,refDatos=null,primera=true,conectado=false,pendienteRemoto=false,ultimoRemoto=null;
-let conf={};try{conf=JSON.parse(localStorage.getItem(KEY_CONF))||{}}catch(e){}
-let syncPrev=Object.assign({},conf);
+let syncPrev={},pend={},tReint=null;
 function hash(str){let h1=0xdeadbeef,h2=0x41c6ce57;for(let i=0,ch;i<str.length;i++){ch=str.charCodeAt(i);h1=Math.imul(h1^ch,2654435761);h2=Math.imul(h2^ch,1597334677)}h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);return(4294967296*(2097151&h2)+(h1>>>0)).toString(36)}
 function plano(s){const o={};for(const c of COLS)for(const x of s[c])o[c+'/'+x.id]=JSON.stringify(x);o.ajustes=JSON.stringify(s.ajustes);return o}
 const huellas=p=>{const o={};for(const k in p)o[k]=hash(p[k]);return o};
 const mismo=(a,b)=>{const ka=Object.keys(a);return ka.length===Object.keys(b).length&&ka.every(k=>a[k]===b[k])};
-function guardarConf(){try{localStorage.setItem(KEY_CONF,JSON.stringify(conf))}catch(e){}}
+function guardarPend(){if(cargado)IDB.set('pend',pend).catch(()=>{})}
 function desdeRemoto(v){v=v||{};const d={ajustes:v.ajustes};for(const c of COLS)d[c]=Object.values(v[c]||{});return normalizar(d)}
 function save(){guardarLocal();if(!refDatos||primera)return;
  const now=plano(S),h=huellas(now),upd={};
  for(const k in h)if(syncPrev[k]!==h[k])upd[k]=JSON.parse(now[k]);
  for(const k in syncPrev)if(!(k in h))upd[k]=null;
  syncPrev=h;if(!Object.keys(upd).length)return;
- refDatos.update(upd).then(()=>{for(const k in upd){if(upd[k]===null)delete conf[k];else conf[k]=h[k]}guardarConf()}).catch(()=>toast('No se ha podido guardar en la nube. Revisa la conexión.'))}
+ Object.assign(pend,upd);guardarPend();enviar(upd)}
+async function enviar(upd){const ks=Object.keys(upd);
+ for(let i=0;i<ks.length;i+=300){const parte={};for(const k of ks.slice(i,i+300))parte[k]=upd[k];
+  try{await refDatos.update(parte);const js=JSON.stringify;for(const k in parte)if(k in pend&&js(pend[k])===js(parte[k]))delete pend[k];guardarPend()}
+  catch(e){toast('No se ha podido guardar en la nube ('+((e&&e.message)||'error')+'). Se volverá a intentar.');clearTimeout(tReint);tReint=setTimeout(reintentar,30000);return}}}
+function reintentar(){if(refDatos&&!primera&&Object.keys(pend).length)enviar(Object.assign({},pend))}
 function aplicarCambios(dest,upd){for(const k in upd){if(k==='ajustes'){if(upd[k])dest.ajustes=normalizar({ajustes:upd[k]}).ajustes;continue}const [c,id]=k.split('/');if(!dest[c])continue;const i=dest[c].findIndex(x=>x.id===id);if(upd[k]===null){if(i>=0)dest[c].splice(i,1)}else if(i>=0)dest[c][i]=upd[k];else dest[c].push(upd[k])}}
-function aplicarRemoto(){const nuevo=desdeRemoto(ultimoRemoto),h=huellas(plano(nuevo));if(mismo(h,syncPrev))return;S=nuevo;syncPrev=h;conf=Object.assign({},h);guardarConf();guardarLocal();render()}
-function primeraCarga(){listo=true;const remoto=desdeRemoto(ultimoRemoto),hr=huellas(plano(remoto));
- if(localStorage.getItem(KEY_UID)===usuario.uid){
-  // Dispositivo ya vinculado: recupera los cambios hechos sin conexión que no llegaron a la nube
-  if(COLS.some(c=>S[c].length)){const now=plano(S),hl=huellas(now),pend={};for(const k in hl)if(conf[k]!==hl[k])pend[k]=JSON.parse(now[k]);for(const k in conf)if(!(k in hl))pend[k]=null;aplicarCambios(remoto,pend)}
- }else{
-  const nl=COLS.reduce((a,c)=>a+S[c].length,0);
+function aplicarRemoto(){const base=desdeRemoto(ultimoRemoto),hb=huellas(plano(base));
+ // Lo que aún no ha confirmado la nube se mantiene: nunca se pierde un cambio local
+ const nuevo=Object.keys(pend).length?(aplicarCambios(base,copia(pend)),base):base;
+ syncPrev=hb;const hn=Object.keys(pend).length?huellas(plano(nuevo)):hb;
+ if(mismo(hn,huellas(plano(S))))return;S=nuevo;guardarLocal();render()}
+function primeraCarga(){listo=true;const base=desdeRemoto(ultimoRemoto),hb=huellas(plano(base)),nuevo=desdeRemoto(ultimoRemoto);
+ if(localStorage.getItem(KEY_UID)===usuario.uid){if(Object.keys(pend).length)aplicarCambios(nuevo,copia(pend))}
+ else{pend={};const nl=COLS.reduce((a,c)=>a+S[c].length,0);
   if(nl&&confirm(`Este dispositivo tiene ${nl} registros guardados antes de iniciar sesión. ¿Quieres añadirlos a tu cuenta?\n\nSi pulsas Cancelar, se descartarán y verás solo los datos de tu cuenta.`)){
-   for(const c of COLS){const ids=new Set(remoto[c].map(x=>x.id));remoto[c].push(...S[c].filter(x=>!ids.has(x.id)))}
-   if(!remoto.ajustes.despacho.nombre&&S.ajustes.despacho.nombre)remoto.ajustes=S.ajustes}
+   for(const c of COLS){const ids=new Set(nuevo[c].map(x=>x.id));nuevo[c].push(...S[c].filter(x=>!ids.has(x.id)))}
+   if(!nuevo.ajustes.despacho.nombre&&S.ajustes.despacho.nombre)nuevo.ajustes=S.ajustes}
   localStorage.setItem(KEY_UID,usuario.uid)}
- S=remoto;syncPrev=hr;conf=Object.assign({},hr);guardarConf();save();render()}
+ S=nuevo;syncPrev=hb;save();render()}
 function alRemoto(snap){ultimoRemoto=snap.val();if(primera){primera=false;primeraCarga();return}if(dlg.open){pendienteRemoto=true;return}aplicarRemoto()}
 dlg.addEventListener('close',()=>{if(pendienteRemoto){pendienteRemoto=false;aplicarRemoto()}});
 const textoRed=()=>conectado?'Conectado: los cambios se guardan en la nube al momento.':'Sin conexión: los cambios se guardan en este dispositivo y se enviarán a la nube cuando vuelva la conexión.';
@@ -363,6 +381,7 @@ function ficha(ent,o,saltar=[]){const cs=campos(ent).filter(f=>!saltar.includes(
  for(const f of cs){const g=/^telefono\d?$/.test(f.k)?'tel':/^email\d?$/.test(f.k)?'mail':'';
   if(g){if(hechos.has(g))continue;hechos.add(g);const vs=cs.filter(x=>(g==='tel'?/^telefono\d?$/:/^email\d?$/).test(x.k)).map(x=>o[x.k]).filter(Boolean);
    pares.push([g==='tel'?'Teléfonos':'Correos',vs.length?vs.map(v=>`<div>${g==='tel'?telHTML(v):`<a href="mailto:${esc(v)}">${esc(v)}</a>`}</div>`).join(''):ND,1,1]);continue}
+  if(ent==='cliente'&&f.custom&&/expedient|asunto/.test(nrm2(f.l))){const ab=S.expedientes.filter(e=>e.clienteId===o.id&&abierto(e));pares.push([f.l,ab.length?ab.map(e=>`<a href="#expediente/${e.id}">${esc(e.numero)}</a>`).join(', '):ND,1,1]);continue}
   const v=o[f.k];if(v===undefined||v===null||v===''){pares.push([f.l,ND,1,f.t==='area']);continue}
   if(f.t==='tel')pares.push([f.l,telHTML(v),1,String(v).length>28]);
   else if(f.t==='email')pares.push([f.l,`<a href="mailto:${esc(v)}">${esc(v)}</a>`,1,String(v).length>28]);
@@ -375,11 +394,12 @@ function apellidosPrimero(n){n=String(n||'').trim();if(!n||n.includes(','))retur
  let i=t.findIndex(x=>CLAVE.test(x));
  if(i<0){let k=t.length,u=0;while(u<2&&k>1){k--;while(k>1&&PART.includes(norm(t[k-1])))k--;u++}i=k}
  if(i<=0||i>=t.length)return n;return t.slice(i).join(' ')+', '+t.slice(0,i).join(' ')}
+function migrar10(){const a=S.ajustes;if(a.migr>=10)return false;for(const e of S.expedientes)if(e.juzgado)e.juzgado=limpiaJuzgado(e.juzgado);a.migr=10;return true}
 function migrar9(){const a=S.ajustes;if(a.migr>=9)return false;
  for(const e of S.expedientes)if(e.estado==='Archiv'+'ado')e.estado='Cerrado';
  for(const c of S.clientes)if(c.tipo!=='Empresa')c.nombre=apellidosPrimero(c.nombre);
- a.migr=9;return true}
-function migrar(){const a=S.ajustes;if(a.migr>=6)return migrar9();
+ a.migr=9;migrar10();return true}
+function migrar(){const a=S.ajustes;if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
  const quitar=s=>{const n=nrm2(s);return ['banco','iban','bic','entidad','sucursal','dc','cuenta','cuenta contable','cuenta p g c','forma pago','forma de pago','portes','transportista','direccion de envio'].includes(n)||n.includes('envio')||n.includes('bancari')};
  const fuera=((a.campos&&a.campos.cliente)||[]).filter(c=>c.custom&&quitar(c.l)).map(c=>c.k);
  const lista=cfgCampos('cliente').filter(f=>!fuera.includes(f.k));
@@ -393,7 +413,10 @@ function evRow(e){const d=dias(e.fecha),a=Math.abs(d),x=expDe(e.expedienteId);
  const cls=e.hecho?'hecho':d<=0?'urg':d<=3?'pronto':'';
  const blq=d===0?'<b>Hoy</b>':`<b>${a}</b><small>${d<0?(a===1?'día tarde':'días tarde'):(a===1?'día':'días')}</small>`;
  return `<div class="row${e.hecho?' is-hecho':''}"><label class="chk" title="Marcar como hecho"><input type="checkbox" data-c="hecho" data-id="${e.id}"${e.hecho?' checked':''} aria-label="Hecho"></label><div class="dias ${cls}">${blq}</div><div class="txt" data-a="editEv" data-id="${e.id}"><div class="t">${esc(e.titulo)}</div><div class="s">${esc(e.tipo||'')}, ${fFecha(e.fecha)}${e.hora?' a las '+esc(e.hora):''}${e.lugar?', '+esc(e.lugar):''}</div>${x?`<div class="s">Exp. ${esc(x.numero)}, ${esc(cliNom(x.clienteId))}</div>`:''}</div></div>`}
-function expRow(e){const solo=!e.asunto||e.asunto===e.numero;return `<a class="row" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?cliNom(e.clienteId):e.asunto)}</div><div class="s">${esc([solo?'':cliNom(e.clienteId),e.materia,e.juzgado].filter(Boolean).join(', '))}</div></div>${e.estado==='Cerrado'?'<span class="tag">Cerrado</span>':''}</a>`}
+const abierto=e=>(e.estado||'Abierto')==='Abierto';
+function expDeCli(id){const ord=(a,b)=>String(a.apertura||'9999').localeCompare(String(b.apertura||'9999'))||String(a.numero).localeCompare(String(b.numero),'es',{numeric:true});const l=S.expedientes.filter(e=>e.clienteId===id);return [...l.filter(abierto).sort(ord),...l.filter(e=>!abierto(e)).sort(ord)]}
+const expRowCli=e=>{const j=limpiaJuzgado(e.juzgado),solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?(j||'Sin juzgado'):e.asunto)}</div>${!solo&&j?`<div class="s">${esc(j)}</div>`:''}</div>${abierto(e)?'':'<span class="tag">Cerrado</span>'}</a>`};
+function expRow(e){const solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?cliNom(e.clienteId):e.asunto)}</div><div class="s">${esc([solo?'':cliNom(e.clienteId),e.materia,limpiaJuzgado(e.juzgado)].filter(Boolean).join(', '))}</div></div>${e.estado==='Cerrado'?'<span class="tag">Cerrado</span>':''}</a>`}
 function facRow(f){const t=tot(f),x=expDe(f.expedienteId);return `<a class="row" href="#factura/${f.id}"><div class="num">${esc(f.numero)}</div><div class="txt"><div class="t">${esc(cliNom(f.clienteId))}</div><div class="s">${fFecha(f.fecha)}${x?', '+esc(x.asunto):''}</div></div><div class="imp"><b>${eur(t.total)}</b>${t.pend>0.004?`<small class="pend">Pendiente ${eur(t.pend)}</small>`:'<small class="ok">Cobrada</small>'}</div></a>`}
 function totalesHTML(f,t){return `<table class="tot"><tr><td>Base imponible</td><td class="r">${eur(t.base)}</td></tr><tr><td>IVA ${esc(f.iva)} %</td><td class="r">${eur(t.iva)}</td></tr>${num(f.irpf)?`<tr><td>Retención IRPF ${esc(f.irpf)} %</td><td class="r">−${eur(t.irpf)}</td></tr>`:''}${t.sup?`<tr><td>Suplidos</td><td class="r">${eur(t.sup)}</td></tr>`:''}<tr class="gt"><td>Total</td><td class="r">${eur(t.total)}</td></tr></table>`}
 
@@ -414,20 +437,19 @@ const filtroCli=(c,m)=>{const x=m[c.id];return FL.cli==='todos'||(FL.cli==='abie
 L.clientes=()=>{if(!S.clientes.length)return vacio('Todavía no hay clientes. Pulsa «Nuevo cliente» o importa los tuyos desde Ajustes.');
  const q=norm(Q.clientes),m=estadoCli();const l=S.clientes.filter(c=>filtroCli(c,m)).filter(c=>!q||textoBusq(c).includes(q)).sort(cmpNom);
  if(!l.length)return vacio(Q.clientes?'Ningún cliente coincide con la búsqueda.':'No hay clientes en este apartado.');
- return `<div class="list">${l.map(c=>{const n=S.expedientes.filter(e=>e.clienteId===c.id&&e.estado!=='Cerrado').length;return `<a class="row" href="#cliente/${c.id}"><div class="txt"><div class="t">${esc(c.nombre)}</div><div class="s">${esc([c.nif,c.telefono,c.poblacion].filter(Boolean).join(', '))||'&nbsp;'}</div></div>${n?`<span class="tag">${n} abierto${n>1?'s':''}</span>`:''}</a>`}).join('')}</div>`};
+ const fc=campoCompanero();
+ return `<div class="list">${l.map(c=>{const x=m[c.id]||{ab:0,ce:0},n=FL.cli==='abiertos'?x.ab:FL.cli==='cerrados'?x.ce:x.ab+x.ce,ab=abogadoDe(c,fc);return `<a class="row cli" href="#cliente/${c.id}"><div class="txt"><div class="t">${esc(c.nombre)}</div></div>${ab?`<span class="abog">${esc(ab)}</span>`:''}<span class="nasu" title="Asuntos">${n}</span></a>`}).join('')}</div>`};
+function campoCompanero(){return cfgCampos('expediente').find(f=>nrm2(f.l)==='companero')}
+function abogadoDe(c,fc){const ex=expDeCli(c.id);let cl='';if(fc)for(const e of ex)if(e[fc.k]){cl=e[fc.k];break}if(!cl)cl=codDe(c.nombre);
+ if(cl){const t=(S.ajustes.claves||{})[cl];return t||cl}
+ const fa=cfgCampos('expediente').find(f=>nrm2(f.l)==='abogado');if(fa)for(const e of ex)if(e[fa.k])return e[fa.k];return ''}
 V.clientes=()=>{const m=estadoCli(),ab=S.clientes.filter(c=>m[c.id]&&m[c.id].ab).length,ce=S.clientes.filter(c=>m[c.id]&&!m[c.id].ab&&m[c.id].ce).length;
  return cab('Clientes',`<button class="btn pri" data-a="nuevoCli">Nuevo cliente</button>`)+chips('cli',[['abiertos','Con expedientes abiertos',ab],['cerrados','Solo cerrados',ce],['todos','Todos',S.clientes.length]])+buscador('clientes','Buscar por nombre, NIF, teléfono…')+`<div id="lst">${L.clientes()}</div>`};
-V.cliente=id=>{const c=byId('clientes',id);if(!c)return noEnc('#clientes','Clientes');
- const ex=S.expedientes.filter(e=>e.clienteId===id).sort(cmpExp);const ids=new Set(ex.map(e=>e.id));
- const ev=S.eventos.filter(e=>!e.hecho&&ids.has(e.expedienteId)).sort(cmpEv);
- const fa=S.facturas.filter(f=>f.clienteId===id).sort(cmpFac);
- const tel=c.telefono?`<a href="tel:${esc(c.telefono.replace(/\s/g,''))}">${esc(c.telefono)}</a>`:'';
- const mail=c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'';
+V.cliente=id=>{const c=byId('clientes',id);if(!c)return noEnc('#clientes','Clientes');const ex=expDeCli(id);
  return volver('#clientes','Clientes')+cab(c.nombre,`<button class="btn" data-a="editCli" data-id="${id}">Editar</button><button class="btn ghost dan" data-a="delCli" data-id="${id}">Borrar</button>`)+
  ficha('cliente',c,['nombre'])+
- sec('Expedientes',`<button class="btn sm" data-a="nuevoExp" data-cli="${id}">Nuevo expediente</button>`,ex.length?`<div class="list">${ex.map(expRow).join('')}</div>`:vacio('Sin expedientes.'))+
- sec('Plazos y citas pendientes','',ev.length?`<div class="list">${ev.map(evRow).join('')}</div>`:vacio('Nada pendiente.'))+
- sec('Facturas',`<button class="btn sm" data-a="nuevaFac" data-cli="${id}">Nueva factura</button>`,fa.length?`<div class="list">${fa.map(facRow).join('')}</div>`:vacio('Sin facturas.'))};
+ sec('Expedientes',`<button class="btn sm" data-a="nuevoExp" data-cli="${id}">Nuevo expediente</button>`,ex.length?`<div class="list">${ex.map(expRowCli).join('')}</div>`:vacio('Sin expedientes.'))+
+ sec('Pagos pendientes','',vacio('Este apartado se preparará más adelante.'))};
 
 L.expedientes=()=>{if(!S.expedientes.length)return vacio('Todavía no hay expedientes. Pulsa «Nuevo expediente» o impórtalos desde Ajustes.');
  const q=norm(Q.expedientes);const l=S.expedientes.filter(e=>FL.exp==='todos'||(e.estado||'Abierto')===FL.exp).filter(e=>!q||(textoBusq(e)+' '+norm(cliNom(e.clienteId))).includes(q)).sort(cmpExp);
@@ -477,24 +499,26 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='9';
+const VERSION='10';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
 function esFichas(filas){let n=0,cod=false;for(const r of filas.slice(0,80))for(const x of r){const s=String(x).trim();if(/:$/.test(s)&&s.length<40){n++;if(nrm2(s)==='codigo')cod=true}}return cod&&n>=5}
-function leerFichas(filas){const recs=[];let cur=null,modo=null,cabs=[];
+function leerFichas(filas){const recs=[];let cur=null,modo=null,cabs=[],prevLab=null;
  const etiq=s=>/:$/.test(s)&&s.length<40;
  const asigna=fila=>{const o={};fila.forEach((v,i)=>{if(!v)return;let c=cabs[0];for(const x of cabs)if(x.i<=i)c=x;o[c.n]=o[c.n]?o[c.n]+' '+v:v});return o};
  for(const raw of filas){const fila=raw.map(x=>String(x??'').trim());const no=fila.filter(Boolean);if(!no.length)continue;
   const labs=[];fila.forEach((s,i)=>{if(etiq(s))labs.push(i)});
-  if(labs.length){modo=null;labs.forEach((i,j)=>{const fin=j+1<labs.length?labs[j+1]:fila.length,k=bonito(fila[i]);let v='';for(let x=i+1;x<fin;x++)if(fila[x]){v=fila[x];break}
-    if(nrm2(fila[i])==='codigo'){if(cur)recs.push(cur);cur={}}if(cur&&!EXCLUIR.includes(k)&&(v||!(k in cur)))cur[k]=v});continue}
+  if(labs.length){modo=null;prevLab=[];labs.forEach((i,j)=>{const fin=j+1<labs.length?labs[j+1]:fila.length,k=bonito(fila[i]);const v=fila.slice(i+1,fin).filter(Boolean).join(' ');
+    if(nrm2(fila[i])==='codigo'){if(cur)recs.push(cur);cur={}}prevLab.push({k,i,fin});if(cur&&!EXCLUIR.includes(k)&&(v||!(k in cur)))cur[k]=v});continue}
+  const pl=prevLab;prevLab=null;
   if(!cur)continue;
   const nn=no.map(nrm2);
   if(no.length===1&&(TITULOS.includes(nn[0])||/^empresa|^pagina|^pag /.test(nn[0]))){modo=null;continue}
   if(nn.includes('telefono')&&(nn.includes('contacto')||nn.includes('tipo'))){modo='tel';cabs=[];fila.forEach((s,i)=>{if(s)cabs.push({i,n:bonito(s)})});continue}
   if(nn.includes('iban')||(nn.includes('banco')&&nn.includes('cuenta'))||nn.includes('portes')||nn.includes('transportista')){modo='ignorar';continue}
   if(modo==='ignorar')continue;
+  if(!modo&&pl&&pl.length){fila.forEach((v,x)=>{if(!v)return;const l=pl.find(z=>x>z.i&&x<z.fin);if(l&&!EXCLUIR.includes(l.k))cur[l.k]=((cur[l.k]||'')+' '+v).trim()});continue}
   if(modo==='tel'){const o=asigna(fila),num=o[cabs[0].n]||'',resto=cabs.slice(1).map(c=>o[c.n]).filter(Boolean).join(', ');const t=num+(resto?' ('+resto+')':'');let n=1;while(n<5&&cur['Teléfono '+n])n++;cur['Teléfono '+n]=cur['Teléfono '+n]?cur['Teléfono '+n]+'; '+t:t;continue}
 }
  if(cur)recs.push(cur);
@@ -504,6 +528,7 @@ function leerFichas(filas){const recs=[];let cur=null,modo=null,cabs=[];
  if(!rows.length)throw new Error('No se han encontrado fichas de clientes en el archivo.');
  return{dest:'clientes',cols,rows,ocultas:['Nombre','Apellidos','Nombre común'],aviso:`Archivo en formato de ficha: se han encontrado ${rows.length} clientes.`}}
 function parseImp(s){s=String(s??'').replace(/[€\s]/g,'');if(!s)return 0;if(/,\d{1,2}$/.test(s))s=s.replace(/\./g,'').replace(',','.');else s=s.replace(/,/g,'');return +s||0}
+const limpiaJuzgado=s=>String(s||'').split(/\s*;\s*/).map(p=>p.replace(/^\s*\d+(\s*[-–.:]\s*|\s+)(?=\D)/,'').replace(/\s*[-–(]\s*\d{3,}\)?\s*$/,'').trim()).filter(Boolean).join('; ');
 const sinPref=s=>String(s||'').replace(/^\s*\d+\s*-\s*/,'').replace(/\s*-\s*$/,'').trim();
 const codDe=s=>{const m=String(s||'').match(/^\s*([A-ZÑ0-9]*[*0-9][A-ZÑ0-9*]*)-\s*\S/i);return m?m[1]:''};
 const sinCod=s=>String(s||'').replace(/^[A-ZÑ0-9]*[*0-9][A-ZÑ0-9*]*-\s*/i,'').trim();
@@ -540,7 +565,7 @@ function leerExpedientes(filas){const F2=filas.map(r=>r.map(x=>String(x??'').tri
   const cu=k=>r.inst.map(i=>parseImp(i[k])).filter(Boolean).map(eur).join('; ');
   const ref=r.datos['s referencia']||'';
   const o={'Número':r.numero,'Asunto':r.asunto||r.numero,'Cliente':cli?cli.nombre.trim():'','Compañero':cli?codDe(cli.nombre):'','Fecha de inicio':r.datos['fecha de inicio']||'','Estado':r.datos['estado del asunto']||'','Su referencia':ref==='0'?'':ref,
-   'Juzgado':j('organismo'),'Nº de procedimiento':j('instancia'),'Tipo de expediente':j('tipo de expediente'),'Cuantía inicial':cu('cuantia inicial'),'Cuantía final':cu('cuantia final'),
+   'Juzgado':limpiaJuzgado(j('organismo')),'Nº de procedimiento':j('instancia'),'Tipo de expediente':j('tipo de expediente'),'Cuantía inicial':cu('cuantia inicial'),'Cuantía final':cu('cuantia final'),
    'Parte contraria':contr.map(con).join('; '),'Letrado contrario':letC.map(con).join('; '),'Procurador':proc.map(con).join('; '),'Abogado':abog.map(x=>sinCod(x.nombre)).join('; '),'Otros intervinientes':otros.join('; ')};
   o.__acts=r.acts.map(a=>({fecha:a.fecha,hora:a.hora,texto:(a.tipo&&!/^libre$/i.test(a.tipo)?a.tipo+': ':'')+a.desc,importe:a.importe,desc:a.desc||a.tipo}));return o});
  const nAct=rows.reduce((s,r)=>s+r.__acts.length,0);
@@ -592,6 +617,7 @@ V.ajustes=()=>{const d=S.ajustes.despacho,a=S.ajustes;
  return cab('Ajustes')+
  sec('Datos del despacho','',`<div class="panel"><p class="nota">Aparecen en la cabecera de las facturas.</p><div class="grid">${[['nombre','Nombre del despacho o del letrado'],['nif','NIF',1],['telefono','Teléfono',1],['direccion','Dirección completa'],['email','Correo electrónico',1],['iban','IBAN para transferencias',1]].map(([k,l,h])=>`<div class="fld${h?' half':''}"><label for="d_${k}">${l}</label><input id="d_${k}" data-d="${k}" value="${esc(d[k])}"></div>`).join('')}
  <div class="fld half"><label for="a_serie">Serie de facturas</label><input id="a_serie" value="${esc(a.serie)}" placeholder="Ej.: F"></div><div class="fld half"><label for="a_iva">IVA por defecto (%)</label><input id="a_iva" inputmode="decimal" value="${esc(a.iva)}"></div><div class="fld half"><label for="a_irpf">Retención IRPF por defecto (%)</label><input id="a_irpf" inputmode="decimal" value="${esc(a.irpf)}"></div></div><button class="btn pri" data-a="guardarAj">Guardar datos</button></div>`)+
+ sec('Compañeros','',clavesHTML())+
  sec('Datos de las fichas','',camposHTML())+
  sec('Importar datos','',importHTML())+
  sec('Copia de seguridad','',`<div class="panel"><p>Descarga un archivo con todos tus datos o recupera una copia anterior.</p><div class="rapidos"><button class="btn" data-a="exportar">Descargar copia</button><label class="btn">Recuperar copia<input type="file" accept=".json,application/json" data-c="restaurar" hidden></label></div></div>`)+
@@ -599,6 +625,9 @@ V.ajustes=()=>{const d=S.ajustes.despacho,a=S.ajustes;
  sec('Borrar todo','',`<div class="panel"><p>Elimina todos los clientes, expedientes, plazos y facturas${fbOk&&usuario?' de tu cuenta, en todos tus dispositivos':' de este dispositivo'}. Descarga antes una copia si la necesitas.</p><button class="btn dan" data-a="borrarTodo">Borrar todos los datos</button></div>`)+
  `<p class="nota pie">Versión ${VERSION}. ${S.clientes.length} clientes, ${S.expedientes.length} expedientes, ${S.eventos.length} plazos y citas, ${S.facturas.length} facturas.</p>`};
 
+function clavesHTML(){const fc=campoCompanero(),set=new Set();if(fc)for(const e of S.expedientes)if(e[fc.k])set.add(e[fc.k]);for(const c of S.clientes){const k=codDe(c.nombre);if(k)set.add(k)}
+ const t=S.ajustes.claves||{},l=[...set].sort();
+ return `<div class="panel"><p class="nota">Escribe el nombre del abogado que corresponde a cada clave. Es el que aparecerá en la lista de clientes.</p>${l.length?`<div class="grid">${l.map(k=>`<div class="fld half"><label>${esc(k)}</label><input data-clave="${esc(k)}" value="${esc(t[k]||'')}" placeholder="Nombre del abogado"></div>`).join('')}</div><button class="btn pri" data-a="guardarClaves">Guardar nombres</button>`:'<p>Todavía no hay claves en los expedientes.</p>'}</div>`}
 let CE='cliente';
 function camposHTML(){const l=cfgCampos(CE);return `<div class="panel"><p class="nota">Elige qué datos tiene cada ficha, cómo se llaman y en qué orden aparecen.</p><div class="chips">${Object.entries(ENT).map(([k,n])=>`<button type="button" class="chip${CE===k?' on':''}" data-a="ce" data-v="${k}">${n}</button>`).join('')}</div>
  <div class="list">${l.map((f,i)=>`<div class="row campo${f.oculto?' is-oculto':''}"><div class="txt"><div class="t">${esc(f.l)}${f.oculto?' <span class="tag">Oculto</span>':''}</div><div class="s">${esc(nomTipo(f))}${f.custom?', añadido por ti':''}${f.req?', obligatorio':''}</div></div><button type="button" class="btn sm ghost" data-a="subeCampo" data-i="${i}" aria-label="Subir ${esc(f.l)}"${i?'':' disabled'}>↑</button><button type="button" class="btn sm ghost" data-a="bajaCampo" data-i="${i}" aria-label="Bajar ${esc(f.l)}"${i<l.length-1?'':' disabled'}>↓</button><button type="button" class="btn sm" data-a="editCampo" data-i="${i}">Editar</button></div>`).join('')}</div>
@@ -657,6 +686,7 @@ const ACT={
  addLinea:()=>{$('#lineas').insertAdjacentHTML('beforeend',lineaHTML({concepto:'',importe:''}));recalc()},
  quitaLinea:(id,b)=>{b.closest('.linea').remove();recalc()},
  ce:(id,b)=>{CE=b.dataset.v;render()},
+ guardarClaves:()=>{const t={};document.querySelectorAll('[data-clave]').forEach(i=>{if(i.value.trim())t[i.dataset.clave]=i.value.trim()});S.ajustes.claves=t;save();toast('Nombres guardados')},
  subeCampo:(id,b)=>moverCampo(+b.dataset.i,-1),
  bajaCampo:(id,b)=>moverCampo(+b.dataset.i,1),
  nuevoCampo:()=>formModal('Añadir dato a '+ENT[CE].toLowerCase(),defCampoNuevo,{tipo:'Texto'},v=>{const l=cfgCampos(CE),f={k:nuevaClave(),l:v.l,custom:1};aplicarTipo(f,v);l.push(f);guardarCfg(CE,l);toast('Dato añadido')}),
@@ -669,7 +699,7 @@ const ACT={
  impCancel:()=>{Object.assign(IMP,{cols:[],rows:[],map:{},nombre:'',nuevos:{},ocultas:[],aviso:''});render()},
  exportar:()=>{const b=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='despacho-copia-'+hoy()+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)},
  olvido:()=>{const em=$('#lg_e').value.trim(),er=$('#lg_err');if(!em){er.textContent='Escribe primero tu correo y vuelve a pulsar.';return}auth.sendPasswordResetEmail(em).then(()=>{er.textContent='';toast('Te hemos enviado un correo para cambiar la contraseña.')}).catch(x=>{er.textContent=errAuth(x.code)})},
- salir:()=>{if(!confirm('¿Cerrar sesión? Los datos se quitarán de este dispositivo, pero seguirán guardados en tu cuenta.'))return;if(refDatos){refDatos.off();refDatos=null}for(const k of [KEY,KEY_UID,KEY_CONF])localStorage.removeItem(k);S=normalizar(null);conf={};syncPrev={};auth.signOut()},
+ salir:()=>{if(!confirm('¿Cerrar sesión? Los datos se quitarán de este dispositivo, pero seguirán guardados en tu cuenta.'))return;if(refDatos){refDatos.off();refDatos=null}for(const k of [KEY,KEY_UID,KEY_CONF])localStorage.removeItem(k);S=normalizar(null);pend={};syncPrev={};clearTimeout(tGuardar);IDB.del('S').catch(()=>{});IDB.del('pend').catch(()=>{});auth.signOut()},
  borrarTodo:()=>{if(confirm(fbOk&&usuario?'¿Borrar todos los datos de tu cuenta, en todos tus dispositivos?':'¿Borrar todos los datos de este dispositivo?')&&confirm('No se puede deshacer. ¿Seguro?')){const aj=S.ajustes;S=normalizar({ajustes:aj});save();render();toast('Datos borrados')}}
 };
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b)return;const f=ACT[b.dataset.a];if(f){e.preventDefault();f(b.dataset.id,b,e)}});
@@ -685,7 +715,8 @@ document.addEventListener('change',async e=>{const t=e.target,c=t.dataset&&t.dat
 
 /* ---------- Arranque ---------- */
 let ultimo='';
-function render(){document.body.classList.toggle('sin-sesion',fbOk&&!usuario);
+function render(){if(!cargado){main.innerHTML='<div class="login"><p class="nota">Cargando…</p></div>';return}
+ document.body.classList.toggle('sin-sesion',fbOk&&!usuario);
  if(fbOk&&!authListo){main.innerHTML='<div class="login"><p class="nota">Cargando…</p></div>';return}
  if(fbOk&&!usuario){main.innerHTML=loginHTML();return}
  if(fbOk&&!listo){main.innerHTML='<div class="login"><p class="nota">Cargando tus datos… La primera vez en cada dispositivo hace falta conexión a internet.</p></div>';return}
@@ -695,13 +726,22 @@ function render(){document.body.classList.toggle('sin-sesion',fbOk&&!usuario);
  main.innerHTML=(V[v]||V.inicio)(id);
  if(h!==ultimo){window.scrollTo(0,0);ultimo=h}}
 window.addEventListener('hashchange',render);
-if(window.firebase){try{firebase.initializeApp(CFG);auth=firebase.auth();auth.languageCode='es';fbOk=true;
+function iniciarFirebase(){if(window.firebase){try{firebase.initializeApp(CFG);auth=firebase.auth();auth.languageCode='es';fbOk=true;
  firebase.database().ref('.info/connected').on('value',s=>{conectado=!!s.val();const el=$('#estadoRed');if(el)el.textContent=textoRed()});
  auth.onAuthStateChanged(u=>{if(refDatos){refDatos.off();refDatos=null}authListo=true;usuario=u;primera=true;
   if(u){listo=localStorage.getItem(KEY_UID)===u.uid;refDatos=firebase.database().ref('despacho/'+u.uid);
    refDatos.on('value',alRemoto,err=>{listo=true;render();toast(String(err.code||'').includes('PERMISSION')?'La base de datos ha rechazado el acceso: revisa las reglas.':'Error al leer la nube: '+err.message)})}
-  render()})}catch(e){console.error(e);fbOk=false}}
-render();
+  render()})}catch(e){console.error(e);fbOk=false}}}
+async function arrancar(){let d=null;
+ try{d=await IDB.get('S');pend=(await IDB.get('pend'))||{}}catch(e){console.error(e)}
+ let deLS=null;try{deLS=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+ if(!d&&deLS)d=deLS;
+ S=normalizar(d);cargado=true;
+ // libera el espacio de localStorage, que comparten todas tus apps de GitHub Pages
+ if(deLS){try{await IDB.set('S',S);localStorage.removeItem(KEY)}catch(e){}}
+ localStorage.removeItem(KEY_CONF);
+ iniciarFirebase();render()}
+render();arrancar();
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 </script>
