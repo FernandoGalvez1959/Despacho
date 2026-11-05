@@ -438,7 +438,8 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(!hit)for(const s of sy){if(s.length<3)continue;hit=nc.find(([c,n])=>!usadas.has(c)&&n.includes(s));if(hit)break}
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
-const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones'];
+const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
+const VERSION='5';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
 function esFichas(filas){let n=0,cod=false;for(const r of filas.slice(0,80))for(const x of r){const s=String(x).trim();if(/:$/.test(s)&&s.length<40){n++;if(nrm2(s)==='codigo')cod=true}}return cod&&n>=5}
@@ -454,6 +455,8 @@ function leerFichas(filas){const recs=[];let cur=null,modo=null,cabs=[];
   if(no.length===1&&(TITULOS.includes(nn[0])||/^empresa|^pagina|^pag /.test(nn[0]))){modo=null;continue}
   if(nn.includes('telefono')&&(nn.includes('contacto')||nn.includes('tipo'))){modo='tel';cabs=[];fila.forEach((s,i)=>{if(s)cabs.push({i,n:bonito(s)})});continue}
   if(nn.includes('iban')||(nn.includes('banco')&&nn.includes('cuenta'))){modo='banco';cabs=[];fila.forEach((s,i)=>{if(s)cabs.push({i,n:bonito(s)})});continue}
+  if(nn.includes('portes')||nn.includes('transportista')){modo='envio';cabs=[];fila.forEach((s,i)=>{if(s)cabs.push({i,n:bonito(s)})});continue}
+  if(modo==='envio'){const o=asigna(fila),t=cabs.map(c=>o[c.n]).filter(Boolean).join(', ');if(t)cur['Dirección de envío']=(cur['Dirección de envío']?cur['Dirección de envío']+'; ':'')+t;continue}
   if(modo==='tel'){const o=asigna(fila),num=o[cabs[0].n]||'',resto=cabs.slice(1).map(c=>o[c.n]).filter(Boolean).join(', ');cur['Teléfonos']=(cur['Teléfonos']?cur['Teléfonos']+'; ':'')+num+(resto?' ('+resto+')':'');continue}
   if(modo==='banco'){Object.assign(cur,asigna(fila));modo=null;continue}}
  if(cur)recs.push(cur);
@@ -502,7 +505,7 @@ V.ajustes=()=>{const d=S.ajustes.despacho,a=S.ajustes;
  sec('Copia de seguridad','',`<div class="panel"><p>Descarga un archivo con todos tus datos o recupera una copia anterior.</p><div class="rapidos"><button class="btn" data-a="exportar">Descargar copia</button><label class="btn">Recuperar copia<input type="file" accept=".json,application/json" data-c="restaurar" hidden></label></div></div>`)+
  sec('Sincronización','',fbOk&&usuario?`<div class="panel"><p>Sesión iniciada como <strong>${esc(usuario.email)}</strong>. Tus datos son los mismos en todos los dispositivos donde entres con esta cuenta.</p><p class="nota" id="estadoRed">${textoRed()}</p><button class="btn" data-a="salir">Cerrar sesión</button></div>`:`<div class="panel"><p>No se ha podido cargar la sincronización, probablemente por falta de conexión. Los cambios se guardan en este dispositivo.</p></div>`)+
  sec('Borrar todo','',`<div class="panel"><p>Elimina todos los clientes, expedientes, plazos y facturas${fbOk&&usuario?' de tu cuenta, en todos tus dispositivos':' de este dispositivo'}. Descarga antes una copia si la necesitas.</p><button class="btn dan" data-a="borrarTodo">Borrar todos los datos</button></div>`)+
- `<p class="nota pie">${S.clientes.length} clientes, ${S.expedientes.length} expedientes, ${S.eventos.length} plazos y citas, ${S.facturas.length} facturas.</p>`};
+ `<p class="nota pie">Versión ${VERSION}. ${S.clientes.length} clientes, ${S.expedientes.length} expedientes, ${S.eventos.length} plazos y citas, ${S.facturas.length} facturas.</p>`};
 
 let CE='cliente';
 function camposHTML(){const l=cfgCampos(CE);return `<div class="panel"><p class="nota">Elige qué datos tiene cada ficha, cómo se llaman y en qué orden aparecen.</p><div class="chips">${Object.entries(ENT).map(([k,n])=>`<button type="button" class="chip${CE===k?' on':''}" data-a="ce" data-v="${k}">${n}</button>`).join('')}</div>
