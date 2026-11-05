@@ -155,6 +155,7 @@ body.sin-sesion main{margin:0 auto}
 .nuevo .txt input{margin-top:4px}
 .tl .actimp{font-size:14.5px;font-variant-numeric:tabular-nums;color:var(--ok)}
 .tl .actimp.neg{color:var(--warn)}
+.chip .cnt{font-size:13px;opacity:.75;font-variant-numeric:tabular-nums}
 #print{display:none}
 @media print{
  .app,#toast,dialog{display:none!important}
@@ -261,7 +262,7 @@ const cmpNom=(a,b)=>String(a.nombre).localeCompare(String(b.nombre),'es',{sensit
 const cmpEv=(a,b)=>String(a.fecha).localeCompare(String(b.fecha))||String(a.hora||'99').localeCompare(String(b.hora||'99'));
 const cmpExp=(a,b)=>String(b.numero).localeCompare(String(a.numero),'es',{numeric:true});
 const cmpFac=(a,b)=>String(b.fecha).localeCompare(String(a.fecha))||String(b.numero).localeCompare(String(a.numero),'es',{numeric:true});
-const expOrden=()=>[...S.expedientes].sort((a,b)=>(a.estado==='Archivado')-(b.estado==='Archivado')||cmpExp(a,b));
+const expOrden=()=>[...S.expedientes].sort((a,b)=>(a.estado==='Cerrado')-(b.estado==='Cerrado')||cmpExp(a,b));
 const expLabel=e=>`${e.numero} ${e.asunto} (${cliNom(e.clienteId)})`;
 function toISO(s){s=String(s||'').trim();if(!s)return '';let m=s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);if(m)return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);if(m){let y=m[3];if(y.length===2)y=(+y>50?'19':'20')+y;return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`}return ''}
 function tot(f){const base=r2((f.lineas||[]).reduce((a,l)=>a+num(l.importe),0));const iva=r2(base*num(f.iva)/100),irpf=r2(base*num(f.irpf)/100),sup=r2(num(f.suplidos));const total=r2(base+iva-irpf+sup);const cobrado=r2((f.cobros||[]).reduce((a,c)=>a+num(c.importe),0));return{base,iva,irpf,sup,total,cobrado,pend:r2(total-cobrado)}}
@@ -295,7 +296,7 @@ const F={
   {k:'numero',l:'Nº de expediente',half:1,ph:'Se asigna solo'},
   {k:'apertura',l:'Fecha de apertura',t:'date',half:1},
   {k:'materia',l:'Materia',t:'select',o:MATERIAS,half:1},
-  {k:'estado',l:'Estado',t:'select',o:['Abierto','Archivado'],half:1},
+  {k:'estado',l:'Estado',t:'select',o:['Abierto','Cerrado'],half:1},
   {k:'juzgado',l:'Juzgado o tribunal'},
   {k:'autos',l:'Nº de procedimiento (autos)'},
   {k:'contrario',l:'Parte contraria'},
@@ -351,9 +352,9 @@ const volver=(h,l)=>`<a class="volver" href="${h}">‹ ${l}</a>`;
 const cab=(t,acc='',sub='')=>`<div class="top"><div class="tit"><h1>${esc(t)}</h1>${sub?`<p class="sub">${sub}</p>`:''}</div><div class="acc">${acc}</div></div>`;
 const sec=(t,acc,cuerpo)=>`<div class="sechead"><h2>${t}</h2>${acc||''}</div>${cuerpo}`;
 const noEnc=(h,l)=>volver(h,l)+vacio('Este registro ya no existe.');
-const Q={},FL={exp:'Abierto',ag:'pend',fac:'pend'};
+const Q={},FL={exp:'Abierto',ag:'pend',fac:'pend',cli:'abiertos'};
 const buscador=(k,ph)=>`<input class="buscar" type="search" data-q="${k}" value="${esc(Q[k]||'')}" placeholder="${ph}" aria-label="${ph}">`;
-const chips=(k,ops)=>`<div class="chips">${ops.map(([v,l])=>`<button type="button" class="chip${FL[k]===v?' on':''}" data-a="filtro" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
+const chips=(k,ops)=>`<div class="chips">${ops.map(([v,l,n])=>`<button type="button" class="chip${FL[k]===v?' on':''}" data-a="filtro" data-k="${k}" data-v="${v}">${l}${n!==undefined?` <span class="cnt">${n.toLocaleString('es-ES')}</span>`:''}</button>`).join('')}</div>`;
 function datos(pares,todos){const p=todos?pares:pares.filter(x=>x[1]);if(!p.length)return '';return `<dl class="panel datos">${p.map(([l,v,html,ancho])=>`<div${ancho?' class="ancho"':''}><dt>${esc(l)}</dt><dd>${html?v:esc(v)}</dd></div>`).join('')}</dl>`}
 
 function telHTML(v){return esc(v).replace(/\+?\d[\d\s.-]{5,}\d/g,m=>`<a href="tel:${m.replace(/[\s.-]/g,'')}">${m}</a>`)}
@@ -368,7 +369,17 @@ function ficha(ent,o,saltar=[]){const cs=campos(ent).filter(f=>!saltar.includes(
   else if(f.t==='date')pares.push([f.l,fFecha(v)]);
   else pares.push([f.l,String(v),0,f.t==='area'||f.k==='direccion'||String(v).length>28])}
  return datos(pares,1)}
-function migrar(){const a=S.ajustes;if(a.migr>=6)return false;
+const PART=['de','del','la','las','los','y','san','santa','da','das','do','dos','van','von','mac','mc'];
+const CLAVE=/^[A-ZÑ0-9]*[*0-9][A-ZÑ0-9*]*-/i;
+function apellidosPrimero(n){n=String(n||'').trim();if(!n||n.includes(','))return n;const t=n.split(/\s+/);if(t.length<2)return n;
+ let i=t.findIndex(x=>CLAVE.test(x));
+ if(i<0){let k=t.length,u=0;while(u<2&&k>1){k--;while(k>1&&PART.includes(norm(t[k-1])))k--;u++}i=k}
+ if(i<=0||i>=t.length)return n;return t.slice(i).join(' ')+', '+t.slice(0,i).join(' ')}
+function migrar9(){const a=S.ajustes;if(a.migr>=9)return false;
+ for(const e of S.expedientes)if(e.estado==='Archiv'+'ado')e.estado='Cerrado';
+ for(const c of S.clientes)if(c.tipo!=='Empresa')c.nombre=apellidosPrimero(c.nombre);
+ a.migr=9;return true}
+function migrar(){const a=S.ajustes;if(a.migr>=6)return migrar9();
  const quitar=s=>{const n=nrm2(s);return ['banco','iban','bic','entidad','sucursal','dc','cuenta','cuenta contable','cuenta p g c','forma pago','forma de pago','portes','transportista','direccion de envio'].includes(n)||n.includes('envio')||n.includes('bancari')};
  const fuera=((a.campos&&a.campos.cliente)||[]).filter(c=>c.custom&&quitar(c.l)).map(c=>c.k);
  const lista=cfgCampos('cliente').filter(f=>!fuera.includes(f.k));
@@ -376,13 +387,13 @@ function migrar(){const a=S.ajustes;if(a.migr>=6)return false;
  guardarCfg('cliente',lista);
  for(const c of S.clientes){for(const k of fuera)delete c[k];
   if(c.telefono&&String(c.telefono).includes('; ')&&!c.telefono2){const p=String(c.telefono).split('; ');c.telefono=p[0];for(let i=1;i<p.length&&i<5;i++)c['telefono'+(i+1)]=i===4?p.slice(4).join('; '):p[i]}}
- a.migr=6;return true}
+ a.migr=6;migrar9();return true}
 const textoBusq=o=>norm(Object.entries(o).filter(([k])=>k!=='id'&&!k.endsWith('Id')).map(([,v])=>typeof v==='object'?'':v).join(' '));
 function evRow(e){const d=dias(e.fecha),a=Math.abs(d),x=expDe(e.expedienteId);
  const cls=e.hecho?'hecho':d<=0?'urg':d<=3?'pronto':'';
  const blq=d===0?'<b>Hoy</b>':`<b>${a}</b><small>${d<0?(a===1?'día tarde':'días tarde'):(a===1?'día':'días')}</small>`;
  return `<div class="row${e.hecho?' is-hecho':''}"><label class="chk" title="Marcar como hecho"><input type="checkbox" data-c="hecho" data-id="${e.id}"${e.hecho?' checked':''} aria-label="Hecho"></label><div class="dias ${cls}">${blq}</div><div class="txt" data-a="editEv" data-id="${e.id}"><div class="t">${esc(e.titulo)}</div><div class="s">${esc(e.tipo||'')}, ${fFecha(e.fecha)}${e.hora?' a las '+esc(e.hora):''}${e.lugar?', '+esc(e.lugar):''}</div>${x?`<div class="s">Exp. ${esc(x.numero)}, ${esc(cliNom(x.clienteId))}</div>`:''}</div></div>`}
-function expRow(e){const solo=!e.asunto||e.asunto===e.numero;return `<a class="row" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?cliNom(e.clienteId):e.asunto)}</div><div class="s">${esc([solo?'':cliNom(e.clienteId),e.materia,e.juzgado].filter(Boolean).join(', '))}</div></div>${e.estado==='Archivado'?'<span class="tag">Archivado</span>':''}</a>`}
+function expRow(e){const solo=!e.asunto||e.asunto===e.numero;return `<a class="row" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?cliNom(e.clienteId):e.asunto)}</div><div class="s">${esc([solo?'':cliNom(e.clienteId),e.materia,e.juzgado].filter(Boolean).join(', '))}</div></div>${e.estado==='Cerrado'?'<span class="tag">Cerrado</span>':''}</a>`}
 function facRow(f){const t=tot(f),x=expDe(f.expedienteId);return `<a class="row" href="#factura/${f.id}"><div class="num">${esc(f.numero)}</div><div class="txt"><div class="t">${esc(cliNom(f.clienteId))}</div><div class="s">${fFecha(f.fecha)}${x?', '+esc(x.asunto):''}</div></div><div class="imp"><b>${eur(t.total)}</b>${t.pend>0.004?`<small class="pend">Pendiente ${eur(t.pend)}</small>`:'<small class="ok">Cobrada</small>'}</div></a>`}
 function totalesHTML(f,t){return `<table class="tot"><tr><td>Base imponible</td><td class="r">${eur(t.base)}</td></tr><tr><td>IVA ${esc(f.iva)} %</td><td class="r">${eur(t.iva)}</td></tr>${num(f.irpf)?`<tr><td>Retención IRPF ${esc(f.irpf)} %</td><td class="r">−${eur(t.irpf)}</td></tr>`:''}${t.sup?`<tr><td>Suplidos</td><td class="r">${eur(t.sup)}</td></tr>`:''}<tr class="gt"><td>Total</td><td class="r">${eur(t.total)}</td></tr></table>`}
 
@@ -398,11 +409,14 @@ V.inicio=()=>{const h=hoy();const pend=S.eventos.filter(e=>!e.hecho).sort(cmpEv)
  <h2 class="sec">Próximas dos semanas</h2>${prox.length?`<div class="list">${prox.map(evRow).join('')}</div>`:vacio('No hay plazos, señalamientos ni citas en los próximos 14 días.')}
  <h2 class="sec">Pendiente de cobro</h2><a class="panel cobro" href="#facturas"><span class="importe">${eur(totalP)}</span><span class="nota">${fp.length===1?'1 factura sin cobrar del todo':fp.length+' facturas sin cobrar del todo'}</span></a>`};
 
+function estadoCli(){const m={};for(const e of S.expedientes){const x=m[e.clienteId]||(m[e.clienteId]={ab:0,ce:0});if((e.estado||'Abierto')==='Abierto')x.ab++;else x.ce++}return m}
+const filtroCli=(c,m)=>{const x=m[c.id];return FL.cli==='todos'||(FL.cli==='abiertos'?!!(x&&x.ab):!!(x&&!x.ab&&x.ce))};
 L.clientes=()=>{if(!S.clientes.length)return vacio('Todavía no hay clientes. Pulsa «Nuevo cliente» o importa los tuyos desde Ajustes.');
- const q=norm(Q.clientes);const l=S.clientes.filter(c=>!q||textoBusq(c).includes(q)).sort(cmpNom);
- if(!l.length)return vacio('Ningún cliente coincide con la búsqueda.');
- return `<div class="list">${l.map(c=>{const n=S.expedientes.filter(e=>e.clienteId===c.id&&e.estado!=='Archivado').length;return `<a class="row" href="#cliente/${c.id}"><div class="txt"><div class="t">${esc(c.nombre)}</div><div class="s">${esc([c.nif,c.telefono,c.poblacion].filter(Boolean).join(', '))||'&nbsp;'}</div></div>${n?`<span class="tag">${n} abierto${n>1?'s':''}</span>`:''}</a>`}).join('')}</div>`};
-V.clientes=()=>cab('Clientes',`<button class="btn pri" data-a="nuevoCli">Nuevo cliente</button>`)+buscador('clientes','Buscar por nombre, NIF, teléfono…')+`<div id="lst">${L.clientes()}</div>`;
+ const q=norm(Q.clientes),m=estadoCli();const l=S.clientes.filter(c=>filtroCli(c,m)).filter(c=>!q||textoBusq(c).includes(q)).sort(cmpNom);
+ if(!l.length)return vacio(Q.clientes?'Ningún cliente coincide con la búsqueda.':'No hay clientes en este apartado.');
+ return `<div class="list">${l.map(c=>{const n=S.expedientes.filter(e=>e.clienteId===c.id&&e.estado!=='Cerrado').length;return `<a class="row" href="#cliente/${c.id}"><div class="txt"><div class="t">${esc(c.nombre)}</div><div class="s">${esc([c.nif,c.telefono,c.poblacion].filter(Boolean).join(', '))||'&nbsp;'}</div></div>${n?`<span class="tag">${n} abierto${n>1?'s':''}</span>`:''}</a>`}).join('')}</div>`};
+V.clientes=()=>{const m=estadoCli(),ab=S.clientes.filter(c=>m[c.id]&&m[c.id].ab).length,ce=S.clientes.filter(c=>m[c.id]&&!m[c.id].ab&&m[c.id].ce).length;
+ return cab('Clientes',`<button class="btn pri" data-a="nuevoCli">Nuevo cliente</button>`)+chips('cli',[['abiertos','Con expedientes abiertos',ab],['cerrados','Solo cerrados',ce],['todos','Todos',S.clientes.length]])+buscador('clientes','Buscar por nombre, NIF, teléfono…')+`<div id="lst">${L.clientes()}</div>`};
 V.cliente=id=>{const c=byId('clientes',id);if(!c)return noEnc('#clientes','Clientes');
  const ex=S.expedientes.filter(e=>e.clienteId===id).sort(cmpExp);const ids=new Set(ex.map(e=>e.id));
  const ev=S.eventos.filter(e=>!e.hecho&&ids.has(e.expedienteId)).sort(cmpEv);
@@ -418,7 +432,7 @@ V.cliente=id=>{const c=byId('clientes',id);if(!c)return noEnc('#clientes','Clien
 L.expedientes=()=>{if(!S.expedientes.length)return vacio('Todavía no hay expedientes. Pulsa «Nuevo expediente» o impórtalos desde Ajustes.');
  const q=norm(Q.expedientes);const l=S.expedientes.filter(e=>FL.exp==='todos'||(e.estado||'Abierto')===FL.exp).filter(e=>!q||(textoBusq(e)+' '+norm(cliNom(e.clienteId))).includes(q)).sort(cmpExp);
  return l.length?`<div class="list">${l.map(expRow).join('')}</div>`:vacio('Ningún expediente coincide.')};
-V.expedientes=()=>cab('Expedientes',`<button class="btn pri" data-a="nuevoExp">Nuevo expediente</button>`)+chips('exp',[['Abierto','Abiertos'],['Archivado','Archivados'],['todos','Todos']])+buscador('expedientes','Buscar por número, asunto, cliente, autos…')+`<div id="lst">${L.expedientes()}</div>`;
+V.expedientes=()=>cab('Expedientes',`<button class="btn pri" data-a="nuevoExp">Nuevo expediente</button>`)+chips('exp',[['Abierto','Abiertos',S.expedientes.filter(e=>(e.estado||'Abierto')==='Abierto').length],['Cerrado','Cerrados',S.expedientes.filter(e=>e.estado==='Cerrado').length],['todos','Todos',S.expedientes.length]])+buscador('expedientes','Buscar por número, asunto, cliente, autos…')+`<div id="lst">${L.expedientes()}</div>`;
 V.expediente=id=>{const e=byId('expedientes',id);if(!e)return noEnc('#expedientes','Expedientes');
  const ev=S.eventos.filter(x=>x.expedienteId===id).sort((a,b)=>(a.hecho-b.hecho)||cmpEv(a,b));
  const act=[...(e.actuaciones||[])].sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
@@ -463,7 +477,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='8';
+const VERSION='9';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -563,7 +577,7 @@ function importar(){const d=IMP.dest,m=Object.assign({},IMP.map),ent=ENTD[d];
    const ex=existeCli(o);if(ex){pon(ex,o);act++;continue}S.clientes.push({id:uid(),creado:hoy(),...o});n++}
   else if(d==='expedientes'){if(!o.asunto&&!o.numero){sin++;continue}
    let c=o.clienteId?buscaCli(o.clienteId):null;if(!c&&o.clienteId){c={id:uid(),creado:hoy(),nombre:o.clienteId,tipo:'Particular'};S.clientes.push(c);nuevosCli++}
-   o.clienteId=c?c.id:'';o.apertura=toISO(o.apertura);o.estado=/archiv|cerrad|baja|finaliz|terminad/i.test(o.estado)?'Archivado':'Abierto';o.materia=o.materia?cap(o.materia.toLowerCase()):'';
+   o.clienteId=c?c.id:'';o.apertura=toISO(o.apertura);o.estado=/archiv|cerrad|baja|finaliz|terminad/i.test(o.estado)?'Cerrado':'Abierto';o.materia=o.materia?cap(o.materia.toLowerCase()):'';
    let e=o.numero?buscaExp(o.numero):null;
    if(e){pon(e,o);act++}else{o.asunto=o.asunto||o.numero;o.numero=o.numero||sigExp();e={id:uid(),actuaciones:[],...o};S.expedientes.push(e);n++}
    if(r.__acts){e.actuaciones=e.actuaciones||[];const ya=new Set(e.actuaciones.map(a=>a.fecha+'|'+a.texto)),h0=hoy();
@@ -675,7 +689,7 @@ function render(){document.body.classList.toggle('sin-sesion',fbOk&&!usuario);
  if(fbOk&&!authListo){main.innerHTML='<div class="login"><p class="nota">Cargando…</p></div>';return}
  if(fbOk&&!usuario){main.innerHTML=loginHTML();return}
  if(fbOk&&!listo){main.innerHTML='<div class="login"><p class="nota">Cargando tus datos… La primera vez en cada dispositivo hace falta conexión a internet.</p></div>';return}
- const h=location.hash.slice(1)||'inicio';const [v,id]=h.split('/');const secc={cliente:'clientes',expediente:'expedientes',factura:'facturas'}[v]||v;
+ const h=location.hash.slice(1)||'clientes';const [v,id]=h.split('/');const secc={cliente:'clientes',expediente:'expedientes',factura:'facturas'}[v]||v;
  document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('on',a.dataset.v===secc));
  if(migrar())save();
  main.innerHTML=(V[v]||V.inicio)(id);
