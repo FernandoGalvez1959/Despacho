@@ -91,9 +91,10 @@ a.row:hover,.row .txt[data-a]:hover .t{color:var(--accent)}
 .aviso h2{margin-bottom:6px}.aviso p{margin:0}
 .cobro{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;text-decoration:none;color:inherit}
 .importe{font-size:30px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
-.datos{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 26px;margin:0}
-.datos dt{font-size:13.5px;color:var(--muted)}
-.datos dd{margin:2px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.datos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px 18px;margin:0;padding:14px 16px}
+.datos dt{font-size:12.5px;color:var(--muted)}
+.datos dd{margin:1px 0 0;font-size:15.5px;white-space:pre-wrap;overflow-wrap:anywhere}
+.datos .nd{color:var(--muted)}
 .datos .ancho{grid-column:1/-1}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 .fld{grid-column:1/-1;margin-bottom:12px}
@@ -275,8 +276,13 @@ const F={
   {k:'nombre',l:'Nombre y apellidos o razón social',req:1},
   {k:'tipo',l:'Tipo',t:'select',o:['Particular','Empresa'],half:1},
   {k:'nif',l:'NIF o CIF',half:1},
-  {k:'telefono',l:'Teléfono',t:'tel',half:1},
-  {k:'email',l:'Correo electrónico',t:'email',half:1},
+  {k:'telefono',l:'Teléfono 1',t:'tel',half:1},
+  {k:'telefono2',l:'Teléfono 2',t:'tel',half:1},
+  {k:'telefono3',l:'Teléfono 3',t:'tel',half:1},
+  {k:'telefono4',l:'Teléfono 4',t:'tel',half:1},
+  {k:'telefono5',l:'Teléfono 5',t:'tel',half:1},
+  {k:'email',l:'Correo 1',t:'email',half:1},
+  {k:'email2',l:'Correo 2',t:'email',half:1},
   {k:'direccion',l:'Dirección'},
   {k:'cp',l:'Código postal',half:1},
   {k:'poblacion',l:'Población',half:1},
@@ -319,7 +325,7 @@ const TIPOS_CAMPO=[['text','Texto'],['area','Texto largo'],['date','Fecha'],['nu
 const nomTipo=f=>f.t==='cliente'?'Cliente':f.t==='expediente'?'Expediente':(TIPOS_CAMPO.find(x=>x[0]===(f.t||'text'))||[0,'Texto'])[1];
 function cfgCampos(ent){const base=F[ent],cfg=(S.ajustes.campos||{})[ent];if(!cfg)return base.map(f=>({...f}));const out=[];
  for(const c of cfg){const b=base.find(f=>f.k===c.k);if(b)out.push({...b,l:c.l||b.l,oculto:!!c.oculto&&!b.req});else if(c.custom)out.push({k:c.k,l:c.l,t:c.t||'text',o:c.o,custom:1,oculto:!!c.oculto,half:['date','number','tel','select'].includes(c.t)?1:0})}
- for(const b of base)if(!out.some(f=>f.k===b.k))out.push({...b});return out}
+ base.forEach((b,bi)=>{if(out.some(f=>f.k===b.k))return;let pos=-1;for(let j=bi-1;j>=0&&pos<0;j--)pos=out.findIndex(f=>f.k===base[j].k);out.splice(pos+1,0,{...b})});return out}
 const campos=ent=>cfgCampos(ent).filter(f=>!f.oculto);
 function guardarCfg(ent,lista){S.ajustes.campos=Object.assign({},S.ajustes.campos);S.ajustes.campos[ent]=lista.map(f=>{const o={k:f.k,l:f.l};if(f.oculto)o.oculto=1;if(f.custom){o.custom=1;o.t=f.t||'text';if(f.t==='select'&&f.o)o.o=f.o}return o})}
 const nuevaClave=()=>'x_'+uid().replace(/[^a-z0-9]/gi,'').slice(0,10);
@@ -346,13 +352,29 @@ const noEnc=(h,l)=>volver(h,l)+vacio('Este registro ya no existe.');
 const Q={},FL={exp:'Abierto',ag:'pend',fac:'pend'};
 const buscador=(k,ph)=>`<input class="buscar" type="search" data-q="${k}" value="${esc(Q[k]||'')}" placeholder="${ph}" aria-label="${ph}">`;
 const chips=(k,ops)=>`<div class="chips">${ops.map(([v,l])=>`<button type="button" class="chip${FL[k]===v?' on':''}" data-a="filtro" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
-function datos(pares){const p=pares.filter(x=>x[1]);if(!p.length)return '';return `<dl class="panel datos">${p.map(([l,v,html,ancho])=>`<div${ancho?' class="ancho"':''}><dt>${esc(l)}</dt><dd>${html?v:esc(v)}</dd></div>`).join('')}</dl>`}
+function datos(pares,todos){const p=todos?pares:pares.filter(x=>x[1]);if(!p.length)return '';return `<dl class="panel datos">${p.map(([l,v,html,ancho])=>`<div${ancho?' class="ancho"':''}><dt>${esc(l)}</dt><dd>${html?v:esc(v)}</dd></div>`).join('')}</dl>`}
 
-function ficha(ent,o,saltar=[]){return datos(campos(ent).filter(f=>!saltar.includes(f.k)&&f.t!=='cliente'&&f.t!=='expediente').map(f=>{const v=o[f.k];if(v===undefined||v===null||v==='')return[f.l,''];
- if(f.t==='tel'){const ns=String(v).match(/\+?\d[\d\s.-]{5,}\d/g);return[f.l,ns?esc(v).replace(/\+?\d[\d\s.-]{5,}\d/g,m=>`<a href="tel:${m.replace(/[\s.-]/g,'')}">${m}</a>`):esc(v),1]}
- if(f.t==='email')return[f.l,`<a href="mailto:${esc(v)}">${esc(v)}</a>`,1];
- if(f.t==='date')return[f.l,fFecha(v)];
- return[f.l,String(v),0,f.t==='area']}))}
+function telHTML(v){return esc(v).replace(/\+?\d[\d\s.-]{5,}\d/g,m=>`<a href="tel:${m.replace(/[\s.-]/g,'')}">${m}</a>`)}
+const ND='<span class="nd">—</span>';
+function ficha(ent,o,saltar=[]){const cs=campos(ent).filter(f=>!saltar.includes(f.k)&&f.t!=='cliente'&&f.t!=='expediente');const pares=[],hechos=new Set();
+ for(const f of cs){const g=/^telefono\d?$/.test(f.k)?'tel':/^email\d?$/.test(f.k)?'mail':'';
+  if(g){if(hechos.has(g))continue;hechos.add(g);const vs=cs.filter(x=>(g==='tel'?/^telefono\d?$/:/^email\d?$/).test(x.k)).map(x=>o[x.k]).filter(Boolean);
+   pares.push([g==='tel'?'Teléfonos':'Correos',vs.length?vs.map(v=>`<div>${g==='tel'?telHTML(v):`<a href="mailto:${esc(v)}">${esc(v)}</a>`}</div>`).join(''):ND,1,1]);continue}
+  const v=o[f.k];if(v===undefined||v===null||v===''){pares.push([f.l,ND,1,f.t==='area']);continue}
+  if(f.t==='tel')pares.push([f.l,telHTML(v),1,String(v).length>28]);
+  else if(f.t==='email')pares.push([f.l,`<a href="mailto:${esc(v)}">${esc(v)}</a>`,1,String(v).length>28]);
+  else if(f.t==='date')pares.push([f.l,fFecha(v)]);
+  else pares.push([f.l,String(v),0,f.t==='area'||f.k==='direccion'||String(v).length>28])}
+ return datos(pares,1)}
+function migrar(){const a=S.ajustes;if(a.migr>=6)return false;
+ const quitar=s=>{const n=nrm2(s);return ['banco','iban','bic','entidad','sucursal','dc','cuenta','cuenta contable','cuenta p g c','forma pago','forma de pago','portes','transportista','direccion de envio'].includes(n)||n.includes('envio')||n.includes('bancari')};
+ const fuera=((a.campos&&a.campos.cliente)||[]).filter(c=>c.custom&&quitar(c.l)).map(c=>c.k);
+ const lista=cfgCampos('cliente').filter(f=>!fuera.includes(f.k));
+ for(const f of lista){if(f.k==='notas')f.oculto=true;if(f.k==='telefono'&&/^tel[eé]fonos?$/i.test(f.l.trim()))f.l='Teléfono 1';if(f.k==='email'&&/^(correo( electr[oó]nico)?|e-?mail)$/i.test(f.l.trim()))f.l='Correo 1'}
+ guardarCfg('cliente',lista);
+ for(const c of S.clientes){for(const k of fuera)delete c[k];
+  if(c.telefono&&String(c.telefono).includes('; ')&&!c.telefono2){const p=String(c.telefono).split('; ');c.telefono=p[0];for(let i=1;i<p.length&&i<5;i++)c['telefono'+(i+1)]=i===4?p.slice(4).join('; '):p[i]}}
+ a.migr=6;return true}
 const textoBusq=o=>norm(Object.entries(o).filter(([k])=>k!=='id'&&!k.endsWith('Id')).map(([,v])=>typeof v==='object'?'':v).join(' '));
 function evRow(e){const d=dias(e.fecha),a=Math.abs(d),x=expDe(e.expedienteId);
  const cls=e.hecho?'hecho':d<=0?'urg':d<=3?'pronto':'';
@@ -431,7 +453,7 @@ const impCampos=d=>campos(ENTD[d]);
 function libresImp(){const usadas=new Set(Object.values(IMP.map).filter(Boolean));return IMP.cols.map((c,i)=>({c,i,...(IMP.nuevos[i]||{on:!IMP.ocultas.includes(c),nombre:c})})).filter(x=>!usadas.has(x.c)&&IMP.rows.some(r=>r[x.c]))}
 const ejemplo=c=>{const v=(IMP.rows.find(r=>r[c])||{})[c]||'';return v.length>40?v.slice(0,40)+'…':v};
 const IMPL={clienteId:'Cliente (nombre o NIF)',expedienteId:'Expediente (número o autos)'};
-const SIN={nombre:['nombre completo','nombre','razon social','cliente','apellidos y nombre','nombre y apellidos','denominacion'],tipo:['tipo cliente','tipo'],nif:['nif','cif','dni','nie','nif cif'],telefono:['telefono','telefonos','tlf','telf','movil','tfno'],email:['email','e mail','correo','mail','correo electronico'],direccion:['direccion','domicilio','calle'],cp:['cp','c p','c postal','codigo postal','cod postal'],poblacion:['poblacion','localidad','ciudad','municipio'],notas:['notas','observaciones','comentarios'],clienteId:['cliente','nombre cliente','nif cliente'],asunto:['asunto','descripcion','objeto','titulo'],numero:['expediente','n expediente','num expediente','n exp','referencia','codigo'],apertura:['apertura','fecha apertura','fecha alta','alta'],materia:['materia','jurisdiccion','especialidad'],estado:['estado','situacion'],juzgado:['juzgado','tribunal','organo','organo judicial'],autos:['autos','procedimiento','n procedimiento','n autos'],contrario:['contrario','parte contraria','adverso','contraparte'],letradoContrario:['letrado contrario','abogado contrario'],procurador:['procurador'],titulo:['descripcion','asunto','titulo','concepto','actuacion'],fecha:['fecha','vencimiento','fecha vencimiento','dia'],hora:['hora'],lugar:['lugar','sala'],expedienteId:['expediente','n expediente','num expediente','autos']};
+const SIN={nombre:['nombre completo','nombre','razon social','cliente','apellidos y nombre','nombre y apellidos','denominacion'],tipo:['tipo cliente','tipo'],nif:['nif','cif','dni','nie','nif cif'],telefono:['telefono 1','telefono','telefonos','tlf','telf','movil','tfno'],telefono2:['telefono 2'],telefono3:['telefono 3'],telefono4:['telefono 4'],telefono5:['telefono 5'],email:['correo electronico','email','e mail','correo','mail','correo 1'],email2:['correo 2','email 2','e mail 2'],direccion:['direccion','domicilio','calle'],cp:['cp','c p','c postal','codigo postal','cod postal'],poblacion:['poblacion','localidad','ciudad','municipio'],notas:['notas','observaciones','comentarios'],clienteId:['cliente','nombre cliente','nif cliente'],asunto:['asunto','descripcion','objeto','titulo'],numero:['expediente','n expediente','num expediente','n exp','referencia','codigo'],apertura:['apertura','fecha apertura','fecha alta','alta'],materia:['materia','jurisdiccion','especialidad'],estado:['estado','situacion'],juzgado:['juzgado','tribunal','organo','organo judicial'],autos:['autos','procedimiento','n procedimiento','n autos'],contrario:['contrario','parte contraria','adverso','contraparte'],letradoContrario:['letrado contrario','abogado contrario'],procurador:['procurador'],titulo:['descripcion','asunto','titulo','concepto','actuacion'],fecha:['fecha','vencimiento','fecha vencimiento','dia'],hora:['hora'],lugar:['lugar','sala'],expedienteId:['expediente','n expediente','num expediente','autos']};
 function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c,nrm2(c)]);
  for(const f of impCampos(dest)){const sy=[...(SIN[f.k]||[]),f.l].map(nrm2);
   let hit=null;for(const s of sy){hit=nc.find(([c,n])=>!usadas.has(c)&&n===s);if(hit)break}
@@ -439,8 +461,9 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='5';
+const VERSION='6';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
+const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
 function esFichas(filas){let n=0,cod=false;for(const r of filas.slice(0,80))for(const x of r){const s=String(x).trim();if(/:$/.test(s)&&s.length<40){n++;if(nrm2(s)==='codigo')cod=true}}return cod&&n>=5}
 function leerFichas(filas){const recs=[];let cur=null,modo=null,cabs=[];
@@ -449,16 +472,15 @@ function leerFichas(filas){const recs=[];let cur=null,modo=null,cabs=[];
  for(const raw of filas){const fila=raw.map(x=>String(x??'').trim());const no=fila.filter(Boolean);if(!no.length)continue;
   const labs=[];fila.forEach((s,i)=>{if(etiq(s))labs.push(i)});
   if(labs.length){modo=null;labs.forEach((i,j)=>{const fin=j+1<labs.length?labs[j+1]:fila.length,k=bonito(fila[i]);let v='';for(let x=i+1;x<fin;x++)if(fila[x]){v=fila[x];break}
-    if(nrm2(fila[i])==='codigo'){if(cur)recs.push(cur);cur={}}if(cur&&(v||!(k in cur)))cur[k]=v});continue}
+    if(nrm2(fila[i])==='codigo'){if(cur)recs.push(cur);cur={}}if(cur&&!EXCLUIR.includes(k)&&(v||!(k in cur)))cur[k]=v});continue}
   if(!cur)continue;
   const nn=no.map(nrm2);
   if(no.length===1&&(TITULOS.includes(nn[0])||/^empresa|^pagina|^pag /.test(nn[0]))){modo=null;continue}
   if(nn.includes('telefono')&&(nn.includes('contacto')||nn.includes('tipo'))){modo='tel';cabs=[];fila.forEach((s,i)=>{if(s)cabs.push({i,n:bonito(s)})});continue}
-  if(nn.includes('iban')||(nn.includes('banco')&&nn.includes('cuenta'))){modo='banco';cabs=[];fila.forEach((s,i)=>{if(s)cabs.push({i,n:bonito(s)})});continue}
-  if(nn.includes('portes')||nn.includes('transportista')){modo='envio';cabs=[];fila.forEach((s,i)=>{if(s)cabs.push({i,n:bonito(s)})});continue}
-  if(modo==='envio'){const o=asigna(fila),t=cabs.map(c=>o[c.n]).filter(Boolean).join(', ');if(t)cur['Dirección de envío']=(cur['Dirección de envío']?cur['Dirección de envío']+'; ':'')+t;continue}
-  if(modo==='tel'){const o=asigna(fila),num=o[cabs[0].n]||'',resto=cabs.slice(1).map(c=>o[c.n]).filter(Boolean).join(', ');cur['Teléfonos']=(cur['Teléfonos']?cur['Teléfonos']+'; ':'')+num+(resto?' ('+resto+')':'');continue}
-  if(modo==='banco'){Object.assign(cur,asigna(fila));modo=null;continue}}
+  if(nn.includes('iban')||(nn.includes('banco')&&nn.includes('cuenta'))||nn.includes('portes')||nn.includes('transportista')){modo='ignorar';continue}
+  if(modo==='ignorar')continue;
+  if(modo==='tel'){const o=asigna(fila),num=o[cabs[0].n]||'',resto=cabs.slice(1).map(c=>o[c.n]).filter(Boolean).join(', ');const t=num+(resto?' ('+resto+')':'');let n=1;while(n<5&&cur['Teléfono '+n])n++;cur['Teléfono '+n]=cur['Teléfono '+n]?cur['Teléfono '+n]+'; '+t:t;continue}
+}
  if(cur)recs.push(cur);
  for(const r of recs)r['Nombre completo']=[r['Nombre'],r['Apellidos']].filter(Boolean).join(' ').trim()||r['Nombre común']||'';
  const cols=[];for(const r of recs)for(const k of Object.keys(r))if(!cols.includes(k))cols.push(k);
@@ -599,6 +621,7 @@ function render(){document.body.classList.toggle('sin-sesion',fbOk&&!usuario);
  if(fbOk&&!listo){main.innerHTML='<div class="login"><p class="nota">Cargando tus datos… La primera vez en cada dispositivo hace falta conexión a internet.</p></div>';return}
  const h=location.hash.slice(1)||'inicio';const [v,id]=h.split('/');const secc={cliente:'clientes',expediente:'expedientes',factura:'facturas'}[v]||v;
  document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('on',a.dataset.v===secc));
+ if(migrar())save();
  main.innerHTML=(V[v]||V.inicio)(id);
  if(h!==ultimo){window.scrollTo(0,0);ultimo=h}}
 window.addEventListener('hashchange',render);
