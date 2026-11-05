@@ -161,7 +161,7 @@ body.sin-sesion main{margin:0 auto}
 .row.exp-ab:hover,.row.exp-ce:hover{filter:brightness(.98)}
 .row.cli{padding:11px 16px}
 .abog{flex:none;max-width:38%;font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.nasu{flex:none;min-width:34px;height:30px;padding:0 8px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;justify-content:center}
+.nasu{flex:none;min-width:34px;height:30px;padding:0 10px;font-size:14px;white-space:nowrap;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;justify-content:center}
 #print{display:none}
 @media print{
  .app,#toast,dialog{display:none!important}
@@ -313,13 +313,14 @@ const F={
   {k:'asunto',l:'Asunto',req:1,ph:'Ej.: Reclamación de cantidad'},
   {k:'numero',l:'Nº de expediente',half:1,ph:'Se asigna solo'},
   {k:'apertura',l:'Fecha de apertura',t:'date',half:1},
-  {k:'materia',l:'Materia',t:'select',o:MATERIAS,half:1},
+  {k:'materia',l:'Materia',t:'select',o:['',...MATERIAS],half:1},
   {k:'estado',l:'Estado',t:'select',o:['Abierto','Cerrado'],half:1},
   {k:'juzgado',l:'Juzgado o tribunal'},
   {k:'autos',l:'Nº de procedimiento (autos)'},
   {k:'contrario',l:'Parte contraria'},
   {k:'letradoContrario',l:'Letrado contrario',half:1},
   {k:'procurador',l:'Procurador',half:1},
+  {k:'companero',l:'Compañero que lo tramita',t:'companero'},
   {k:'notas',l:'Notas',t:'area'}],
  evento:[
   {k:'tipo',l:'Tipo',t:'select',o:TIPOS_EV,half:1},
@@ -335,6 +336,7 @@ function campo(f,v){const id='f_'+f.k;v=v??'';let inp;
  if(f.t==='select'){const o=(!v||f.o.includes(v))?f.o:[v,...f.o];inp=`<select id="${id}">${o.map(x=>opt(x,x,x===v)).join('')}</select>`}
  else if(f.t==='cliente')inp=`<select id="${id}">${opt('','Elige un cliente',!v)}${[...S.clientes].sort(cmpNom).map(c=>opt(c.id,c.nombre,c.id===v)).join('')}</select>`;
  else if(f.t==='expediente')inp=`<select id="${id}">${opt('','Sin expediente',!v)}${expOrden().map(e=>opt(e.id,expLabel(e),e.id===v)).join('')}</select>`;
+ else if(f.t==='companero'){const l=[...(S.ajustes.companeros||[])];if(v&&!l.includes(v))l.unshift(v);inp=`<select id="${id}">${opt('','Sin asignar',!v)}${l.map(x=>opt(x,x,x===v)).join('')}</select>`}
  else if(f.t==='area')inp=`<textarea id="${id}" rows="3">${esc(v)}</textarea>`;
  else if(f.t==='number')inp=`<input id="${id}" type="text" inputmode="decimal" value="${esc(v)}"${f.ph?` placeholder="${esc(f.ph)}"`:''}>`;
  else inp=`<input id="${id}" type="${f.t||'text'}" value="${esc(v)}"${f.ph?` placeholder="${esc(f.ph)}"`:''}>`;
@@ -343,7 +345,7 @@ function campo(f,v){const id='f_'+f.k;v=v??'';let inp;
 /* ---------- Datos configurables de las fichas ---------- */
 const ENT={cliente:'Clientes',expediente:'Expedientes',evento:'Plazos y citas'};
 const TIPOS_CAMPO=[['text','Texto'],['area','Texto largo'],['date','Fecha'],['number','Número'],['tel','Teléfono'],['email','Correo electrónico'],['select','Lista de opciones']];
-const nomTipo=f=>f.t==='cliente'?'Cliente':f.t==='expediente'?'Expediente':(TIPOS_CAMPO.find(x=>x[0]===(f.t||'text'))||[0,'Texto'])[1];
+const nomTipo=f=>f.t==='cliente'?'Cliente':f.t==='expediente'?'Expediente':f.t==='companero'?'Lista de compañeros':(TIPOS_CAMPO.find(x=>x[0]===(f.t||'text'))||[0,'Texto'])[1];
 function cfgCampos(ent){const base=F[ent],cfg=(S.ajustes.campos||{})[ent];if(!cfg)return base.map(f=>({...f}));const out=[];
  for(const c of cfg){const b=base.find(f=>f.k===c.k);if(b)out.push({...b,l:c.l||b.l,oculto:!!c.oculto&&!b.req});else if(c.custom)out.push({k:c.k,l:c.l,t:c.t||'text',o:c.o,custom:1,oculto:!!c.oculto,half:['date','number','tel','select'].includes(c.t)?1:0})}
  base.forEach((b,bi)=>{if(out.some(f=>f.k===b.k))return;let pos=-1;for(let j=bi-1;j>=0&&pos<0;j--)pos=out.findIndex(f=>f.k===base[j].k);out.splice(pos+1,0,{...b})});return out}
@@ -381,7 +383,7 @@ function ficha(ent,o,saltar=[]){const cs=campos(ent).filter(f=>!saltar.includes(
  for(const f of cs){const g=/^telefono\d?$/.test(f.k)?'tel':/^email\d?$/.test(f.k)?'mail':'';
   if(g){if(hechos.has(g))continue;hechos.add(g);const vs=cs.filter(x=>(g==='tel'?/^telefono\d?$/:/^email\d?$/).test(x.k)).map(x=>o[x.k]).filter(Boolean);
    pares.push([g==='tel'?'Teléfonos':'Correos',vs.length?vs.map(v=>`<div>${g==='tel'?telHTML(v):`<a href="mailto:${esc(v)}">${esc(v)}</a>`}</div>`).join(''):ND,1,1]);continue}
-  if(ent==='cliente'&&f.custom&&/expedient|asunto/.test(nrm2(f.l))){const ab=S.expedientes.filter(e=>e.clienteId===o.id&&abierto(e));pares.push([f.l,ab.length?ab.map(e=>`<a href="#expediente/${e.id}">${esc(e.numero)}</a>`).join(', '):ND,1,1]);continue}
+  if(ent==='cliente'&&f.custom&&/expedient|asunto/.test(nrm2(f.l))){const ab=S.expedientes.filter(e=>e.clienteId===o.id&&abierto(e));pares.push(['Expedientes abiertos',String(ab.length)]);continue}
   const v=o[f.k];if(v===undefined||v===null||v===''){pares.push([f.l,ND,1,f.t==='area']);continue}
   if(f.t==='tel')pares.push([f.l,telHTML(v),1,String(v).length>28]);
   else if(f.t==='email')pares.push([f.l,`<a href="mailto:${esc(v)}">${esc(v)}</a>`,1,String(v).length>28]);
@@ -394,12 +396,16 @@ function apellidosPrimero(n){n=String(n||'').trim();if(!n||n.includes(','))retur
  let i=t.findIndex(x=>CLAVE.test(x));
  if(i<0){let k=t.length,u=0;while(u<2&&k>1){k--;while(k>1&&PART.includes(norm(t[k-1])))k--;u++}i=k}
  if(i<=0||i>=t.length)return n;return t.slice(i).join(' ')+', '+t.slice(0,i).join(' ')}
-function migrar10(){const a=S.ajustes;if(a.migr>=10)return false;for(const e of S.expedientes)if(e.juzgado)e.juzgado=limpiaJuzgado(e.juzgado);a.migr=10;return true}
+function migrar11(){const a=S.ajustes;if(a.migr>=11)return false;
+ const cfg=(a.campos&&a.campos.expediente)||[],fuera=cfg.filter(c=>c.custom&&nrm2(c.l)==='companero').map(c=>c.k);
+ if(fuera.length){guardarCfg('expediente',cfgCampos('expediente').filter(f=>!fuera.includes(f.k)));for(const e of S.expedientes)for(const k of fuera)delete e[k]}
+ delete a.claves;for(const e of S.expedientes)if(e.juzgado)e.juzgado=limpiaJuzgado(e.juzgado);a.migr=11;return true}
+function migrar10(){const a=S.ajustes;if(a.migr>=10)return false;for(const e of S.expedientes)if(e.juzgado)e.juzgado=limpiaJuzgado(e.juzgado);a.migr=10;migrar11();return true}
 function migrar9(){const a=S.ajustes;if(a.migr>=9)return false;
  for(const e of S.expedientes)if(e.estado==='Archiv'+'ado')e.estado='Cerrado';
  for(const c of S.clientes)if(c.tipo!=='Empresa')c.nombre=apellidosPrimero(c.nombre);
  a.migr=9;migrar10();return true}
-function migrar(){const a=S.ajustes;if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
+function migrar(){const a=S.ajustes;if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
  const quitar=s=>{const n=nrm2(s);return ['banco','iban','bic','entidad','sucursal','dc','cuenta','cuenta contable','cuenta p g c','forma pago','forma de pago','portes','transportista','direccion de envio'].includes(n)||n.includes('envio')||n.includes('bancari')};
  const fuera=((a.campos&&a.campos.cliente)||[]).filter(c=>c.custom&&quitar(c.l)).map(c=>c.k);
  const lista=cfgCampos('cliente').filter(f=>!fuera.includes(f.k));
@@ -416,7 +422,7 @@ function evRow(e){const d=dias(e.fecha),a=Math.abs(d),x=expDe(e.expedienteId);
 const abierto=e=>(e.estado||'Abierto')==='Abierto';
 function expDeCli(id){const ord=(a,b)=>String(a.apertura||'9999').localeCompare(String(b.apertura||'9999'))||String(a.numero).localeCompare(String(b.numero),'es',{numeric:true});const l=S.expedientes.filter(e=>e.clienteId===id);return [...l.filter(abierto).sort(ord),...l.filter(e=>!abierto(e)).sort(ord)]}
 const expRowCli=e=>{const j=limpiaJuzgado(e.juzgado),solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?(j||'Sin juzgado'):e.asunto)}</div>${!solo&&j?`<div class="s">${esc(j)}</div>`:''}</div>${abierto(e)?'':'<span class="tag">Cerrado</span>'}</a>`};
-function expRow(e){const solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?cliNom(e.clienteId):e.asunto)}</div><div class="s">${esc([solo?'':cliNom(e.clienteId),e.materia,limpiaJuzgado(e.juzgado)].filter(Boolean).join(', '))}</div></div>${e.estado==='Cerrado'?'<span class="tag">Cerrado</span>':''}</a>`}
+function expRow(e){const solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?cliNom(e.clienteId):e.asunto)}</div><div class="s">${esc([solo?'':cliNom(e.clienteId),e.materia,limpiaJuzgado(e.juzgado)].filter(Boolean).join(', '))}</div></div>${e.companero?`<span class="abog">${esc(e.companero)}</span>`:''}${e.estado==='Cerrado'?'<span class="tag">Cerrado</span>':''}</a>`}
 function facRow(f){const t=tot(f),x=expDe(f.expedienteId);return `<a class="row" href="#factura/${f.id}"><div class="num">${esc(f.numero)}</div><div class="txt"><div class="t">${esc(cliNom(f.clienteId))}</div><div class="s">${fFecha(f.fecha)}${x?', '+esc(x.asunto):''}</div></div><div class="imp"><b>${eur(t.total)}</b>${t.pend>0.004?`<small class="pend">Pendiente ${eur(t.pend)}</small>`:'<small class="ok">Cobrada</small>'}</div></a>`}
 function totalesHTML(f,t){return `<table class="tot"><tr><td>Base imponible</td><td class="r">${eur(t.base)}</td></tr><tr><td>IVA ${esc(f.iva)} %</td><td class="r">${eur(t.iva)}</td></tr>${num(f.irpf)?`<tr><td>Retención IRPF ${esc(f.irpf)} %</td><td class="r">−${eur(t.irpf)}</td></tr>`:''}${t.sup?`<tr><td>Suplidos</td><td class="r">${eur(t.sup)}</td></tr>`:''}<tr class="gt"><td>Total</td><td class="r">${eur(t.total)}</td></tr></table>`}
 
@@ -437,12 +443,7 @@ const filtroCli=(c,m)=>{const x=m[c.id];return FL.cli==='todos'||(FL.cli==='abie
 L.clientes=()=>{if(!S.clientes.length)return vacio('Todavía no hay clientes. Pulsa «Nuevo cliente» o importa los tuyos desde Ajustes.');
  const q=norm(Q.clientes),m=estadoCli();const l=S.clientes.filter(c=>filtroCli(c,m)).filter(c=>!q||textoBusq(c).includes(q)).sort(cmpNom);
  if(!l.length)return vacio(Q.clientes?'Ningún cliente coincide con la búsqueda.':'No hay clientes en este apartado.');
- const fc=campoCompanero();
- return `<div class="list">${l.map(c=>{const x=m[c.id]||{ab:0,ce:0},n=FL.cli==='abiertos'?x.ab:FL.cli==='cerrados'?x.ce:x.ab+x.ce,ab=abogadoDe(c,fc);return `<a class="row cli" href="#cliente/${c.id}"><div class="txt"><div class="t">${esc(c.nombre)}</div></div>${ab?`<span class="abog">${esc(ab)}</span>`:''}<span class="nasu" title="Asuntos">${n}</span></a>`}).join('')}</div>`};
-function campoCompanero(){return cfgCampos('expediente').find(f=>nrm2(f.l)==='companero')}
-function abogadoDe(c,fc){const ex=expDeCli(c.id);let cl='';if(fc)for(const e of ex)if(e[fc.k]){cl=e[fc.k];break}if(!cl)cl=codDe(c.nombre);
- if(cl){const t=(S.ajustes.claves||{})[cl];return t||cl}
- const fa=cfgCampos('expediente').find(f=>nrm2(f.l)==='abogado');if(fa)for(const e of ex)if(e[fa.k])return e[fa.k];return ''}
+ return `<div class="list">${l.map(c=>{const x=m[c.id]||{ab:0,ce:0};return `<a class="row cli" href="#cliente/${c.id}"><div class="txt"><div class="t">${esc(c.nombre)}</div></div><span class="nasu">Expedientes abiertos: ${x.ab}</span></a>`}).join('')}</div>`};
 V.clientes=()=>{const m=estadoCli(),ab=S.clientes.filter(c=>m[c.id]&&m[c.id].ab).length,ce=S.clientes.filter(c=>m[c.id]&&!m[c.id].ab&&m[c.id].ce).length;
  return cab('Clientes',`<button class="btn pri" data-a="nuevoCli">Nuevo cliente</button>`)+chips('cli',[['abiertos','Con expedientes abiertos',ab],['cerrados','Solo cerrados',ce],['todos','Todos',S.clientes.length]])+buscador('clientes','Buscar por nombre, NIF, teléfono…')+`<div id="lst">${L.clientes()}</div>`};
 V.cliente=id=>{const c=byId('clientes',id);if(!c)return noEnc('#clientes','Clientes');const ex=expDeCli(id);
@@ -499,7 +500,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='10';
+const VERSION='11';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -528,7 +529,7 @@ function leerFichas(filas){const recs=[];let cur=null,modo=null,cabs=[],prevLab=
  if(!rows.length)throw new Error('No se han encontrado fichas de clientes en el archivo.');
  return{dest:'clientes',cols,rows,ocultas:['Nombre','Apellidos','Nombre común'],aviso:`Archivo en formato de ficha: se han encontrado ${rows.length} clientes.`}}
 function parseImp(s){s=String(s??'').replace(/[€\s]/g,'');if(!s)return 0;if(/,\d{1,2}$/.test(s))s=s.replace(/\./g,'').replace(',','.');else s=s.replace(/,/g,'');return +s||0}
-const limpiaJuzgado=s=>String(s||'').split(/\s*;\s*/).map(p=>p.replace(/^\s*\d+(\s*[-–.:]\s*|\s+)(?=\D)/,'').replace(/\s*[-–(]\s*\d{3,}\)?\s*$/,'').trim()).filter(Boolean).join('; ');
+const limpiaJuzgado=s=>String(s||'').split(/\s*;\s*/).map(p=>p.replace(/^\s*(\d+\s*[ºª°]?\.?\s*[-–:]?\s*)+(?=[A-Za-zÁÉÍÓÚÑáéíóúñ])/,'').replace(/\s*[-–(]\s*\d{3,}\)?\s*$/,'').trim()).filter(Boolean).join('; ');
 const sinPref=s=>String(s||'').replace(/^\s*\d+\s*-\s*/,'').replace(/\s*-\s*$/,'').trim();
 const codDe=s=>{const m=String(s||'').match(/^\s*([A-ZÑ0-9]*[*0-9][A-ZÑ0-9*]*)-\s*\S/i);return m?m[1]:''};
 const sinCod=s=>String(s||'').replace(/^[A-ZÑ0-9]*[*0-9][A-ZÑ0-9*]*-\s*/i,'').trim();
@@ -555,7 +556,7 @@ function leerExpedientes(filas){const F2=filas.map(r=>r.map(x=>String(x??'').tri
    cur.acts.push({fecha:f,hora:hm?hm[1].padStart(2,'0')+':'+hm[2]:'',tipo:(o.tipo||'').trim(),desc:(o.descripcion||'').trim(),importe:parseImp(o.importe)})}});
  if(cur)recs.push(cur);
  if(!recs.length)throw new Error('No se han encontrado expedientes en el archivo.');
- const COLS=['Número','Asunto','Cliente','Compañero','Fecha de inicio','Estado','Su referencia','Juzgado','Nº de procedimiento','Tipo de expediente','Cuantía inicial','Cuantía final','Parte contraria','Letrado contrario','Procurador','Abogado','Otros intervinientes'];
+ const COLS=['Número','Asunto','Cliente','Fecha de inicio','Estado','Su referencia','Juzgado','Nº de procedimiento','Tipo de expediente','Cuantía inicial','Cuantía final','Parte contraria','Letrado contrario','Procurador','Abogado','Otros intervinientes'];
  const rows=recs.map(r=>{const p=r.personas,cli=p.propios.find(x=>/client/i.test(x.rel))||p.propios[0];
   const esLet=x=>/abogad|letrad/i.test(x.rel),esProc=x=>/procurad/i.test(x.rel);
   const contr=p.contrarios.filter(x=>!esLet(x)&&!esProc(x)),letC=p.contrarios.filter(esLet),proc=[...p.propios,...p.comunes].filter(esProc),abog=p.propios.filter(esLet);
@@ -564,7 +565,7 @@ function leerExpedientes(filas){const F2=filas.map(r=>r.map(x=>String(x??'').tri
   const j=k=>r.inst.map(i=>sinPref(i[k])).filter(Boolean).join('; ');
   const cu=k=>r.inst.map(i=>parseImp(i[k])).filter(Boolean).map(eur).join('; ');
   const ref=r.datos['s referencia']||'';
-  const o={'Número':r.numero,'Asunto':r.asunto||r.numero,'Cliente':cli?cli.nombre.trim():'','Compañero':cli?codDe(cli.nombre):'','Fecha de inicio':r.datos['fecha de inicio']||'','Estado':r.datos['estado del asunto']||'','Su referencia':ref==='0'?'':ref,
+  const o={'Número':r.numero,'Asunto':r.asunto||r.numero,'Cliente':cli?cli.nombre.trim():'','Fecha de inicio':r.datos['fecha de inicio']||'','Estado':r.datos['estado del asunto']||'','Su referencia':ref==='0'?'':ref,
    'Juzgado':limpiaJuzgado(j('organismo')),'Nº de procedimiento':j('instancia'),'Tipo de expediente':j('tipo de expediente'),'Cuantía inicial':cu('cuantia inicial'),'Cuantía final':cu('cuantia final'),
    'Parte contraria':contr.map(con).join('; '),'Letrado contrario':letC.map(con).join('; '),'Procurador':proc.map(con).join('; '),'Abogado':abog.map(x=>sinCod(x.nombre)).join('; '),'Otros intervinientes':otros.join('; ')};
   o.__acts=r.acts.map(a=>({fecha:a.fecha,hora:a.hora,texto:(a.tipo&&!/^libre$/i.test(a.tipo)?a.tipo+': ':'')+a.desc,importe:a.importe,desc:a.desc||a.tipo}));return o});
@@ -617,7 +618,7 @@ V.ajustes=()=>{const d=S.ajustes.despacho,a=S.ajustes;
  return cab('Ajustes')+
  sec('Datos del despacho','',`<div class="panel"><p class="nota">Aparecen en la cabecera de las facturas.</p><div class="grid">${[['nombre','Nombre del despacho o del letrado'],['nif','NIF',1],['telefono','Teléfono',1],['direccion','Dirección completa'],['email','Correo electrónico',1],['iban','IBAN para transferencias',1]].map(([k,l,h])=>`<div class="fld${h?' half':''}"><label for="d_${k}">${l}</label><input id="d_${k}" data-d="${k}" value="${esc(d[k])}"></div>`).join('')}
  <div class="fld half"><label for="a_serie">Serie de facturas</label><input id="a_serie" value="${esc(a.serie)}" placeholder="Ej.: F"></div><div class="fld half"><label for="a_iva">IVA por defecto (%)</label><input id="a_iva" inputmode="decimal" value="${esc(a.iva)}"></div><div class="fld half"><label for="a_irpf">Retención IRPF por defecto (%)</label><input id="a_irpf" inputmode="decimal" value="${esc(a.irpf)}"></div></div><button class="btn pri" data-a="guardarAj">Guardar datos</button></div>`)+
- sec('Compañeros','',clavesHTML())+
+ sec('Compañeros','',companerosHTML())+
  sec('Datos de las fichas','',camposHTML())+
  sec('Importar datos','',importHTML())+
  sec('Copia de seguridad','',`<div class="panel"><p>Descarga un archivo con todos tus datos o recupera una copia anterior.</p><div class="rapidos"><button class="btn" data-a="exportar">Descargar copia</button><label class="btn">Recuperar copia<input type="file" accept=".json,application/json" data-c="restaurar" hidden></label></div></div>`)+
@@ -625,9 +626,8 @@ V.ajustes=()=>{const d=S.ajustes.despacho,a=S.ajustes;
  sec('Borrar todo','',`<div class="panel"><p>Elimina todos los clientes, expedientes, plazos y facturas${fbOk&&usuario?' de tu cuenta, en todos tus dispositivos':' de este dispositivo'}. Descarga antes una copia si la necesitas.</p><button class="btn dan" data-a="borrarTodo">Borrar todos los datos</button></div>`)+
  `<p class="nota pie">Versión ${VERSION}. ${S.clientes.length} clientes, ${S.expedientes.length} expedientes, ${S.eventos.length} plazos y citas, ${S.facturas.length} facturas.</p>`};
 
-function clavesHTML(){const fc=campoCompanero(),set=new Set();if(fc)for(const e of S.expedientes)if(e[fc.k])set.add(e[fc.k]);for(const c of S.clientes){const k=codDe(c.nombre);if(k)set.add(k)}
- const t=S.ajustes.claves||{},l=[...set].sort();
- return `<div class="panel"><p class="nota">Escribe el nombre del abogado que corresponde a cada clave. Es el que aparecerá en la lista de clientes.</p>${l.length?`<div class="grid">${l.map(k=>`<div class="fld half"><label>${esc(k)}</label><input data-clave="${esc(k)}" value="${esc(t[k]||'')}" placeholder="Nombre del abogado"></div>`).join('')}</div><button class="btn pri" data-a="guardarClaves">Guardar nombres</button>`:'<p>Todavía no hay claves en los expedientes.</p>'}</div>`}
+function companerosHTML(){const l=S.ajustes.companeros||[];
+ return `<div class="panel"><p class="nota">Nombres de los compañeros que tramitan expedientes. Luego, en cada expediente, eliges uno en «Compañero que lo tramita».</p>${l.length?`<div class="list" style="margin-bottom:12px">${l.map((n,i)=>`<div class="row"><div class="txt"><div class="t">${esc(n)}</div></div><button type="button" class="btn sm ghost dan" data-a="quitaComp" data-i="${i}">Quitar</button></div>`).join('')}</div>`:''}<div class="addact" style="grid-template-columns:1fr auto"><input id="nuevoComp" placeholder="Nombre y apellidos" aria-label="Nombre del compañero"><button class="btn pri" data-a="addComp">Añadir</button></div></div>`}
 let CE='cliente';
 function camposHTML(){const l=cfgCampos(CE);return `<div class="panel"><p class="nota">Elige qué datos tiene cada ficha, cómo se llaman y en qué orden aparecen.</p><div class="chips">${Object.entries(ENT).map(([k,n])=>`<button type="button" class="chip${CE===k?' on':''}" data-a="ce" data-v="${k}">${n}</button>`).join('')}</div>
  <div class="list">${l.map((f,i)=>`<div class="row campo${f.oculto?' is-oculto':''}"><div class="txt"><div class="t">${esc(f.l)}${f.oculto?' <span class="tag">Oculto</span>':''}</div><div class="s">${esc(nomTipo(f))}${f.custom?', añadido por ti':''}${f.req?', obligatorio':''}</div></div><button type="button" class="btn sm ghost" data-a="subeCampo" data-i="${i}" aria-label="Subir ${esc(f.l)}"${i?'':' disabled'}>↑</button><button type="button" class="btn sm ghost" data-a="bajaCampo" data-i="${i}" aria-label="Bajar ${esc(f.l)}"${i<l.length-1?'':' disabled'}>↓</button><button type="button" class="btn sm" data-a="editCampo" data-i="${i}">Editar</button></div>`).join('')}</div>
@@ -668,7 +668,7 @@ const ACT={
  delCli:id=>{const n=S.expedientes.filter(e=>e.clienteId===id).length,nf=S.facturas.filter(f=>f.clienteId===id).length;
   if(n||nf){alert(`Este cliente tiene ${n} expedientes y ${nf} facturas. Bórralos antes o pásalos a otro cliente.`);return}
   if(confirm('¿Borrar este cliente?')){S.clientes=S.clientes.filter(c=>c.id!==id);save();go('#clientes');toast('Cliente borrado')}},
- nuevoExp:(id,b)=>{if(faltaCliente())return;formModal('Nuevo expediente',campos('expediente'),{clienteId:b.dataset.cli||'',apertura:hoy(),estado:'Abierto',materia:'Civil'},v=>{const e={id:uid(),actuaciones:[],...v};if(!e.numero)e.numero=sigExp();S.expedientes.push(e);location.hash='#expediente/'+e.id})},
+ nuevoExp:(id,b)=>{if(faltaCliente())return;formModal('Nuevo expediente',campos('expediente'),{clienteId:b.dataset.cli||'',apertura:hoy(),estado:'Abierto',materia:''},v=>{const e={id:uid(),actuaciones:[],...v};if(!e.numero)e.numero=sigExp();S.expedientes.push(e);location.hash='#expediente/'+e.id})},
  editExp:id=>{const e=byId('expedientes',id);formModal('Editar expediente',campos('expediente'),e,v=>{if(!v.numero)v.numero=e.numero||sigExp();Object.assign(e,v)})},
  delExp:id=>{const ne=S.eventos.filter(x=>x.expedienteId===id).length;if(!confirm(`¿Borrar este expediente?${ne?` Se borrarán también sus ${ne} plazos y citas.`:''} Las facturas se conservan.`))return;
   S.expedientes=S.expedientes.filter(e=>e.id!==id);S.eventos=S.eventos.filter(x=>x.expedienteId!==id);S.facturas.forEach(f=>{if(f.expedienteId===id)f.expedienteId=''});save();go('#expedientes');toast('Expediente borrado')},
@@ -686,7 +686,8 @@ const ACT={
  addLinea:()=>{$('#lineas').insertAdjacentHTML('beforeend',lineaHTML({concepto:'',importe:''}));recalc()},
  quitaLinea:(id,b)=>{b.closest('.linea').remove();recalc()},
  ce:(id,b)=>{CE=b.dataset.v;render()},
- guardarClaves:()=>{const t={};document.querySelectorAll('[data-clave]').forEach(i=>{if(i.value.trim())t[i.dataset.clave]=i.value.trim()});S.ajustes.claves=t;save();toast('Nombres guardados')},
+ addComp:()=>{const v=$('#nuevoComp').value.trim();if(!v){$('#nuevoComp').focus();return}const l=[...(S.ajustes.companeros||[])];if(l.some(x=>norm(x)===norm(v))){toast('Ese nombre ya está en la lista');return}l.push(v);l.sort((a,b)=>a.localeCompare(b,'es'));S.ajustes.companeros=l;save();render();toast('Compañero añadido')},
+ quitaComp:(id,b)=>{const l=[...(S.ajustes.companeros||[])],n=l[+b.dataset.i];const u=S.expedientes.filter(e=>e.companero===n).length;if(!confirm(`¿Quitar a ${n} de la lista?${u?` Tiene ${u} expedientes asignados, que quedarán sin asignar.`:''}`))return;l.splice(+b.dataset.i,1);S.ajustes.companeros=l;S.expedientes.forEach(e=>{if(e.companero===n)e.companero=''});save();render()},
  subeCampo:(id,b)=>moverCampo(+b.dataset.i,-1),
  bajaCampo:(id,b)=>moverCampo(+b.dataset.i,1),
  nuevoCampo:()=>formModal('Añadir dato a '+ENT[CE].toLowerCase(),defCampoNuevo,{tipo:'Texto'},v=>{const l=cfgCampos(CE),f={k:nuevaClave(),l:v.l,custom:1};aplicarTipo(f,v);l.push(f);guardarCfg(CE,l);toast('Dato añadido')}),
