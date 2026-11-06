@@ -595,7 +595,7 @@ function movDesdeActs(e){const acts=(e.actuaciones||[]).filter(a=>num(a.importe)
  if(e.prevHonorarios===undefined&&cargos)e.prevHonorarios=r2(Math.max(0,cargos-abonos));return n}
 const fLarga=f=>{if(!f)return '';const d=new Date(f+'T00:00');return isNaN(d)?f:d.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'})};
 const fCorta=f=>{if(!f)return '';const d=new Date(f+'T00:00');return isNaN(d)?f:d.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit'})};
-function prevHTML(e){const v=num(e.prevHonorarios);return `<div class="panel"><div class="prev">${v?`<span class="importe">${eur(v)}</span>`:'<span class="nota">Sin previsión</span>'}<div class="addact" style="grid-template-columns:1fr auto"><input id="prevH" inputmode="decimal" value="${v?v.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}):''}" placeholder="Importe en €" aria-label="Previsión de honorarios pendientes"><button class="btn" data-a="guardaPrev" data-id="${e.id}">Guardar</button></div></div></div>`}
+function prevHTML(e){const v=num(e.prevHonorarios);return `<div class="panel"><div class="prev"><span class="${v?'importe':'nota'}">${v?eur(v):'Sin previsión'}</span><button class="btn" data-a="editPrev" data-id="${e.id}">${v?'Modificar':'Añadir importe'}</button></div></div>`}
 function movHTML(e){const l=[...(e.movimientos||[])].sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));let s=0,ti=0,tg=0;
  const filas=l.map(m=>{const i=num(m.ingreso),g=num(m.gasto);s=r2(s+i-g);ti+=i;tg+=g;return `<tr class="editable" data-a="editMov" data-id="${e.id}" data-mov="${m.id}" title="Pulsa para modificar"><td class="fc">${fCorta(m.fecha)}</td><td>${esc(m.concepto)}<small class="fm">${fCorta(m.fecha)}</small></td><td class="r ing">${i?eur(i):''}</td><td class="r gas">${g?eur(g):''}</td><td class="r impm ${i-g<0?'gas':'ing'}">${eur(i-g)}</td><td class="r sal${s<0?' neg':''}">${eur(s)}</td><td class="c"><button type="button" class="x" data-a="delMov" data-id="${e.id}" data-mov="${m.id}" aria-label="Borrar movimiento">×</button></td></tr>`}).join('');
  return `<div class="panel"><div class="addmov"><input type="date" id="mvF" value="${hoy()}" aria-label="Fecha"><input id="mvC" placeholder="Concepto" aria-label="Concepto"><input id="mvI" inputmode="decimal" placeholder="Ingreso €" aria-label="Ingreso"><input id="mvG" inputmode="decimal" placeholder="Gasto €" aria-label="Gasto"><button class="btn pri" data-a="addMov" data-id="${e.id}">Añadir</button></div>
@@ -646,7 +646,7 @@ L.clientes=()=>{if(!S.clientes.length)return vacio('Todavía no hay clientes. Pu
  return orden.map(k=>{const nc=grupos[k].length,ne=grupos[k].reduce((s,c)=>s+((m[c.id]||{}).ab||0),0);return `<h3 class="mes grp">${k?esc(k):'Sin letrado asignado'} <span class="cnt">${plu(nc,'cliente','clientes')} · ${plu(ne,'expediente abierto','expedientes abiertos')}</span></h3><div class="list">${grupos[k].map(c=>fila(c,0)).join('')}</div>`}).join('')};
 V.clientes=()=>{const m=estadoCli(),ab=S.clientes.filter(c=>m[c.id]&&m[c.id].ab).length,ce=S.clientes.filter(c=>m[c.id]&&!m[c.id].ab&&m[c.id].ce).length;
  return cab('Clientes',`<button class="btn pri" data-a="nuevoCli">Nuevo cliente</button>`)+chips('cli',[['abiertos','Con expedientes abiertos',ab],['cerrados','Solo cerrados',ce],['sin','Sin expedientes',S.clientes.filter(c=>!m[c.id]).length],['todos','Todos',S.clientes.length]])+`<div class="orden"><span class="nota">Ordenar por</span>${chips('ord',[['nombre','Nombre'],['letrado','Letrado']])}</div>`+buscador('clientes','Buscar por nombre, NIF, teléfono, letrado…')+`<div id="lst">${L.clientes()}</div>`};
-const VER_EC={};
+const VER_EC={},VER_ACT={};
 V.cliente=id=>{const c=byId('clientes',id);if(!c)return noEnc('#clientes','Clientes');const todos=expDeCli(id),ex=todos.filter(abierto),ce=todos.filter(e=>!abierto(e));
  return volver('#clientes','Clientes')+cab(c.nombre,`<button class="btn" data-a="editCli" data-id="${id}">Editar</button><button class="btn ghost dan" data-a="delCli" data-id="${id}">Borrar</button>`)+
  ficha('cliente',c,['nombre'])+
@@ -659,14 +659,14 @@ L.expedientes=()=>{if(!S.expedientes.length)return vacio('Todavía no hay expedi
 V.expedientes=()=>cab('Expedientes',`<button class="btn pri" data-a="nuevoExp">Nuevo expediente</button>`)+chips('exp',[['Abierto','Abiertos',S.expedientes.filter(abierto).length],['Cerrado','Cerrados',S.expedientes.filter(e=>!abierto(e)).length],['todos','Todos',S.expedientes.length]])+buscador('expedientes','Buscar por número, asunto, cliente, autos…')+`<div id="lst">${L.expedientes()}</div>`;
 V.expediente=id=>{const e=byId('expedientes',id);if(!e)return noEnc('#expedientes','Expedientes');
  const ev=(e.actuaciones||[]).filter(a=>a.pendiente).sort((x,y)=>String(x.fechaTarea||x.fecha).localeCompare(String(y.fechaTarea||y.fecha)));
- const act=[...(e.actuaciones||[])].sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
+ const actTodas=[...(e.actuaciones||[])].sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))),act=VER_ACT[id]?actTodas:actTodas.slice(0,10);
  const fa=S.facturas.filter(f=>f.expedienteId===id).sort(cmpFac);
  return volver('#expedientes','Expedientes')+cab('Expediente '+e.numero,`<button class="btn" data-a="revisado" data-id="${id}">Revisado hoy</button><button class="btn" data-a="editExp" data-id="${id}">Editar</button><button class="btn ghost dan" data-a="delExp" data-id="${id}">Borrar</button>`,`<a href="#cliente/${e.clienteId}">${esc(cliNom(e.clienteId))}</a>`)+
  ficha('expediente',e,['numero'])+
  sec('Tareas pendientes',`<button class="btn sm" data-a="nuevaTarea" data-id="${id}">Añadir</button>`,ev.length?`<div class="list">${ev.map(a=>tareaActRow(e,a)).join('')}</div>`:vacio('Sin tareas pendientes.'))+
  sec('Actuaciones','',`<div class="panel"><div class="addact"><input type="date" id="actF" value="${hoy()}" aria-label="Fecha"><textarea id="actT" rows="2" placeholder="Escrito presentado, llamada, notificación…" aria-label="Actuación"></textarea><button class="btn pri" data-a="addAct" data-id="${id}">Añadir</button></div>
  <div class="actpend"><label><input type="checkbox" id="actP"> Tarea pendiente</label><input type="date" id="actFT" aria-label="Fecha de la tarea"></div>
- ${act.length?`<ol class="tl">${act.map(a=>`<li${a.pendiente?' class="pte"':''}><div class="actx" data-a="editAct" data-id="${id}" data-act="${a.id}" title="Pulsa para modificar"><time>${fFecha(a.fecha)}${a.hora?', '+esc(a.hora):''}</time><p>${esc(a.texto)}</p>${a.importe?`<p class="actimp ${a.importe<0?'neg':''}">${eur(a.importe)}</p>`:''}<p class="estado-t">${a.pendiente?`Tarea pendiente: ${fFecha(a.fechaTarea||a.fecha)}`:'Terminada'}</p></div><button type="button" class="x mail" data-a="mailAct" data-id="${id}" data-act="${a.id}" aria-label="Enviar por correo" title="Enviar por correo">✉</button><button type="button" class="x" data-a="delAct" data-id="${id}" data-act="${a.id}" aria-label="Borrar actuación">×</button></li>`).join('')}</ol>`:''}</div>`)+
+ ${actTodas.length>10?`<p class="nota" style="margin:14px 0 0">${VER_ACT[id]?`Mostrando las ${actTodas.length} actuaciones.`:`Mostrando las 10 últimas de ${actTodas.length}.`}</p>`:''}${act.length?`<ol class="tl">${act.map(a=>`<li${a.pendiente?' class="pte"':''}><div class="actx" data-a="editAct" data-id="${id}" data-act="${a.id}" title="Pulsa para modificar"><time>${fFecha(a.fecha)}${a.hora?', '+esc(a.hora):''}</time><p>${esc(a.texto)}</p>${a.importe?`<p class="actimp ${a.importe<0?'neg':''}">${eur(a.importe)}</p>`:''}<p class="estado-t">${a.pendiente?`Tarea pendiente: ${fFecha(a.fechaTarea||a.fecha)}`:'Terminada'}</p></div><button type="button" class="x mail" data-a="mailAct" data-id="${id}" data-act="${a.id}" aria-label="Enviar por correo" title="Enviar por correo">✉</button><button type="button" class="x" data-a="delAct" data-id="${id}" data-act="${a.id}" aria-label="Borrar actuación">×</button></li>`).join('')}</ol>${actTodas.length>10?`<button type="button" class="btn ancho" data-a="verActs" data-id="${id}">${VER_ACT[id]?'Ver solo las 10 últimas':`Ver todas las actuaciones (${actTodas.length})`}</button>`:''}`:''}</div>`)+
  sec('Previsión de honorarios pendientes','',prevHTML(e))+
  sec('Ingresos y gastos','',movHTML(e))+
  sec('Costas','',costasHTML(e))};
@@ -705,7 +705,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='29';
+const VERSION='30';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -958,6 +958,11 @@ const ACT={
     else{S.ajustes.listas=Object.assign({},S.ajustes.listas,{procuradores:lista});S.expedientes.forEach(x=>{if(x.procuradorPropio===n)x.procuradorPropio=v.nombre})}
     ponContacto(tipo,n,'','')}
    ponContacto(tipo,v.nombre,v.email,v.tel);toast('Datos guardados')})},
+ editPrev:id=>{const e=byId('expedientes',id),v=num(e.prevHonorarios);
+  formModal('Previsión de honorarios pendientes',[{k:'imp',l:'Importe (€)',t:'number'}],{imp:v?v.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}):''},x=>{const t=String(x.imp||'').trim();
+   if(t&&!/^-?[\d.,\s]+(€|eur|euros)?$/i.test(t)){$('#err').textContent='Escribe solo el importe, por ejemplo 1.500,00';return false}
+   e.prevHonorarios=parseImp(t);toast(t?'Previsión guardada: '+eur(e.prevHonorarios):'Previsión borrada')})},
+ verActs:id=>{VER_ACT[id]=!VER_ACT[id];render()},
  revisado:id=>{const e=byId('expedientes',id);e.ultimaRevision=hoy();save();render();toast('Última revisión: hoy')},
  mailAct:(id,b)=>mailActuacion(id,b.dataset.act),
  addComp:()=>{const v=$('#nuevoComp').value.trim();if(!v){$('#nuevoComp').focus();return}const l=[...(S.ajustes.companeros||[])];if(l.some(x=>norm(x)===norm(v))){toast('Ese nombre ya está en la lista');return}l.push(v);l.sort((a,b)=>a.localeCompare(b,'es'));S.ajustes.companeros=l;ponContacto('letrado',v,($('#nuevoCompMail')||{}).value?.trim(),($('#nuevoCompTel')||{}).value?.trim());save();render();toast('Letrado añadido')},
