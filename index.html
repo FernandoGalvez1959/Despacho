@@ -217,6 +217,16 @@ table.mov tr.editable{cursor:pointer}
 .b-sit{background:var(--accent-soft);color:var(--accent)}
 .b-rev{background:var(--danger-soft);color:var(--danger)}
 .badges.sobre span{background:var(--surface);border:1px solid currentColor}
+.prevcli{margin-top:6px;font-size:13.5px;color:var(--muted)}
+.prevcli b{font-variant-numeric:tabular-nums;font-size:15px;color:var(--ink)}
+.totprev{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px}
+.list.prevl .row.pv{display:grid;grid-template-columns:150px 1.2fr 1.4fr 130px;gap:12px;align-items:baseline;padding:11px 16px}
+.row.pv .pvx{font-variant-numeric:tabular-nums;color:var(--muted);font-size:14.5px}
+.row.pv .pva{font-weight:500;overflow-wrap:anywhere}
+.row.pv .pvc{font-size:14.5px;overflow-wrap:anywhere}
+.row.pv .pvi{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+@media (max-width:640px){.list.prevl .row.pv{grid-template-columns:1fr auto;grid-template-areas:"x i" "a i" "c i";gap:2px 12px}
+ .row.pv .pvx{grid-area:x}.row.pv .pva{grid-area:a}.row.pv .pvc{grid-area:c}.row.pv .pvi{grid-area:i;align-self:center}}
 .ok-t{flex:none;width:40px;height:40px;border-radius:10px;border:1.5px solid var(--ok);background:transparent;color:var(--ok);font-size:20px;font-weight:600;cursor:pointer}
 .ok-t:hover{background:var(--ok);color:var(--surface)}
 .addcos{display:grid;grid-template-columns:1fr 120px 90px auto;gap:8px}
@@ -257,7 +267,7 @@ table.mov .c{width:36px}table.mov .x{position:static;width:30px;height:30px}
   <a href="#clientes" data-v="clientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>Clientes</a>
   <a href="#expedientes" data-v="expedientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg>Expedientes</a>
   <a href="#agenda" data-v="agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Agenda</a>
-  <a href="#facturas" data-v="facturas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>Facturas</a>
+  <a href="#prevision" data-v="prevision"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 9a4 4 0 1 0 0 6M7.5 11h6M7.5 13h6"/></svg>Previsión</a>
   <a href="#ajustes" data-v="ajustes" class="nav-aj"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Ajustes</a>
  </nav>
  <main id="main"></main>
@@ -585,7 +595,7 @@ function evRow(e){const d=dias(e.fecha),a=Math.abs(d),x=expDe(e.expedienteId);
 const estadoN=e=>/cerr|archiv|baja|finaliz|termin|conclu/i.test(String(e.estado||''))?'Cerrado':'Abierto';
 const abierto=e=>estadoN(e)==='Abierto';
 function expDeCli(id){const ord=(a,b)=>String(a.apertura||'9999').localeCompare(String(b.apertura||'9999'))||String(a.numero).localeCompare(String(b.numero),'es',{numeric:true});const l=S.expedientes.filter(e=>e.clienteId===id);return [...l.filter(abierto).sort(ord),...l.filter(e=>!abierto(e)).sort(ord)]}
-const expRowCli=e=>{const j=limpiaJuzgado(e.juzgado),solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?(j||'Sin juzgado'):e.asunto)}</div>${!solo&&j?`<div class="s">${esc(j)}</div>`:''}<div class="badges sobre"><span class="b-sit">${e.situacion?esc(e.situacion):'Sin situación'}</span><span class="b-rev">${e.ultimaRevision?'Revisado '+fLarga(e.ultimaRevision):'Sin revisar'}</span></div></div>${abierto(e)?'':'<span class="tag">Cerrado</span>'}</a>`};
+const expRowCli=e=>{const j=limpiaJuzgado(e.juzgado),solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?(j||'Sin juzgado'):e.asunto)}</div>${!solo&&j?`<div class="s">${esc(j)}</div>`:''}<div class="badges sobre"><span class="b-sit">${e.situacion?esc(e.situacion):'Sin situación'}</span><span class="b-rev">${e.ultimaRevision?'Revisado '+fLarga(e.ultimaRevision):'Sin revisar'}</span></div>${abierto(e)&&num(e.prevHonorarios)?`<div class="prevcli">Previsión de honorarios pendientes: <b>${eur(num(e.prevHonorarios))}</b></div>`:''}</div>${abierto(e)?'':'<span class="tag">Cerrado</span>'}</a>`};
 function expRow(e){const solo=!e.asunto||e.asunto===e.numero;return `<a class="row" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?cliNom(e.clienteId):e.asunto)}</div><div class="s">${esc([solo?'':cliNom(e.clienteId),e.materia,limpiaJuzgado(e.juzgado)].filter(Boolean).join(', '))}</div><div class="badges"><span class="b-sit">${e.situacion?esc(e.situacion):'Sin situación'}</span><span class="b-rev">${e.ultimaRevision?'Revisado '+fLarga(e.ultimaRevision):'Sin revisar'}</span></div></div>${e.companero?`<span class="abog">${esc(e.companero)}</span>`:''}${abierto(e)?'':'<span class="tag">Cerrado</span>'}</a>`}
 function facRow(f){const t=tot(f),x=expDe(f.expedienteId);return `<a class="row" href="#factura/${f.id}"><div class="num">${esc(f.numero)}</div><div class="txt"><div class="t">${esc(cliNom(f.clienteId))}</div><div class="s">${fFecha(f.fecha)}${x?', '+esc(x.asunto):''}</div></div><div class="imp"><b>${eur(t.total)}</b>${t.pend>0.004?`<small class="pend">Pendiente ${eur(t.pend)}</small>`:'<small class="ok">Cobrada</small>'}</div></a>`}
 function movDesdeActs(e){const acts=(e.actuaciones||[]).filter(a=>num(a.importe));if(!acts.length)return 0;
@@ -679,6 +689,14 @@ L.agenda=()=>{const TE=todosEventos().filter(e=>!e.hecho);if(!TE.length)return v
  return `<div class="list agenda"><div class="row ag cabag"><div class="agf">Fecha</div><div class="agx">Expediente</div><div class="agc">Cliente</div><div class="agt">Tarea pendiente</div></div>${l.map(agendaRow).join('')}</div>`};
 V.agenda=()=>cab('Agenda',`<button class="btn pri" data-a="nuevoEv">Nueva tarea</button>`)+`<p class="nota" style="margin-top:-8px">Ordenadas de la más cercana a hoy a la más lejana. Las pasadas se ven en rojo y siguen aquí hasta que las des por terminadas en su expediente.</p>`+buscador('agenda','Buscar por expediente, cliente o tarea…')+`<div id="lst">${L.agenda()}</div>`;
 
+FL.prev='importe';
+function prevRow(e){return `<a class="row pv" href="#expediente/${e.id}"><div class="pvx">${esc(e.numero)}</div><div class="pva">${esc(e.asunto&&e.asunto!==e.numero?e.asunto:'—')}</div><div class="pvc">${esc(cliNom(e.clienteId))}${abierto(e)?'':' <span class="tag">Cerrado</span>'}</div><div class="pvi">${eur(num(e.prevHonorarios))}</div></a>`}
+L.prevision=()=>{const q=norm(Q.prevision);let l=S.expedientes.filter(e=>num(e.prevHonorarios)>0);if(!l.length)return vacio('Ningún expediente tiene previsión de honorarios pendientes.');
+ l=l.filter(e=>!q||norm([e.numero,e.asunto,cliNom(e.clienteId)].join(' ')).includes(q));
+ const o={importe:(a,b)=>num(b.prevHonorarios)-num(a.prevHonorarios),cliente:(a,b)=>cliNom(a.clienteId).localeCompare(cliNom(b.clienteId),'es'),expediente:(a,b)=>String(a.numero).localeCompare(String(b.numero),'es',{numeric:true})}[FL.prev];l.sort(o);
+ if(!l.length)return vacio('Ningún expediente coincide con la búsqueda.');const t=l.reduce((s,e)=>s+num(e.prevHonorarios),0);
+ return `<div class="panel totprev"><span class="nota">${l.length===1?'1 expediente':l.length.toLocaleString('es-ES')+' expedientes'}</span><span class="importe">${eur(r2(t))}</span></div><div class="list prevl"><div class="row pv cabag"><div class="pvx">Expediente</div><div class="pva">Asunto</div><div class="pvc">Cliente</div><div class="pvi">Importe</div></div>${l.map(prevRow).join('')}</div>`};
+V.prevision=()=>cab('Previsión de honorarios pendientes')+`<div class="orden"><span class="nota">Ordenar por</span>${chips('prev',[['importe','Importe'],['cliente','Cliente'],['expediente','Expediente']])}</div>`+buscador('prevision','Buscar por expediente, asunto o cliente…')+`<div id="lst">${L.prevision()}</div>`;
 L.facturas=()=>{if(!S.facturas.length)return vacio('Todavía no hay facturas. Pulsa «Nueva factura» para crear la primera.');
  const q=norm(Q.facturas);const l=S.facturas.filter(f=>{const p=tot(f).pend>0.004;return FL.fac==='todas'||(FL.fac==='pend'?p:!p)}).filter(f=>!q||norm([f.numero,cliNom(f.clienteId),expDe(f.expedienteId)?.asunto].join(' ')).includes(q)).sort(cmpFac);
  return l.length?`<div class="list">${l.map(facRow).join('')}</div>`:vacio('No hay facturas con este filtro.')};
@@ -705,7 +723,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='30';
+const VERSION='31';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
