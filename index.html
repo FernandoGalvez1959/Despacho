@@ -259,6 +259,14 @@ table.mov .c{width:36px}table.mov .x{position:static;width:30px;height:30px}
  .pfc{margin-bottom:24px}.pfc p{margin:0 0 6px}
  .tot .gt td{border-top:1.5px solid #000}
  .pfnotas{white-space:pre-wrap;margin-top:24px}
+ .pl header{display:flex;justify-content:space-between;gap:20px;margin-bottom:14px}
+ .pl h1{font-size:16pt;margin:0 0 2px}.pl header p{margin:0;font-size:10pt;text-align:right}.pl header div p{text-align:left}
+ .pl table{width:100%;border-collapse:collapse;font-size:9.5pt}
+ .pl th,.pl td{border-bottom:0.5pt solid #999;padding:4pt 5pt;text-align:left;vertical-align:top}
+ .pl th{font-weight:600;border-bottom:1pt solid #000}
+ .pl .r{text-align:right;white-space:nowrap}
+ .pl tfoot td{font-weight:600;border-top:1pt solid #000;border-bottom:0}
+ .pl tr{break-inside:avoid}
 }
 </style>
 </head>
@@ -651,19 +659,22 @@ function mailActuacion(id,actId){const e=byId('expedientes',id),a=(e.actuaciones
   const to=[...dlgForm.querySelectorAll('[data-mail]')].filter(x=>x.checked).map(x=>x.dataset.mail).concat($('#m_otros').value.split(/[,;\s]+/).filter(Boolean));
   if(!to.length){$('#err').textContent='Elige al menos un destinatario.';return false}
   abrirURL('mailto:'+to.map(encodeURIComponent).join(',')+'?subject='+encodeURIComponent($('#m_asunto').value)+'&body='+encodeURIComponent($('#m_cuerpo').value));dlg.close();return false},null,'','Abrir en el correo')}
+function imprimirLista(titulo,sub,cols,filas,pie){const d=S.ajustes.despacho;
+ $('#print').innerHTML=`<div class="pl"><header><div><h1>${esc(titulo)}</h1><p>${esc(sub)}</p></div><p>${esc(d.nombre||'')}<br>${cap(fFecha(hoy(),1))}</p></header>
+ <table><thead><tr>${cols.map(c=>`<th class="${c.r?'r':''}">${esc(c.t)}</th>`).join('')}</tr></thead><tbody>${filas.map(f=>`<tr>${f.map((v,i)=>`<td class="${cols[i].r?'r':''}">${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody>${pie?`<tfoot><tr>${pie.map((v,i)=>`<td class="${cols[i].r?'r':''}">${esc(v)}</td>`).join('')}</tr></tfoot>`:''}</table></div>`;
+ setTimeout(()=>window.print(),60)}
 function totalesHTML(f,t){return `<table class="tot"><tr><td>Base imponible</td><td class="r">${eur(t.base)}</td></tr><tr><td>IVA ${esc(f.iva)} %</td><td class="r">${eur(t.iva)}</td></tr>${num(f.irpf)?`<tr><td>Retención IRPF ${esc(f.irpf)} %</td><td class="r">−${eur(t.irpf)}</td></tr>`:''}${t.sup?`<tr><td>Suplidos</td><td class="r">${eur(t.sup)}</td></tr>`:''}<tr class="gt"><td>Total</td><td class="r">${eur(t.total)}</td></tr></table>`}
 
 /* ---------- Vistas ---------- */
 const V={},L={};
-V.inicio=()=>{const h=hoy();const pend=todosEventos().filter(e=>!e.hecho).sort(cmpEv);const venc=pend.filter(e=>e.fecha<h);const prox=pend.filter(e=>e.fecha>=h&&dias(e.fecha)<=14);
- const fp=S.facturas.map(tot).filter(t=>t.pend>0.004);const totalP=fp.reduce((a,t)=>a+t.pend,0);
+V.inicio=()=>{const h=hoy();const pend=todosEventos().filter(e=>!e.hecho).sort(cmpEv);const venc=pend.filter(e=>e.fecha<h);const prox=pend.filter(e=>e.fecha>=h&&dias(e.fecha)<=30);
+ const ep=S.expedientes.filter(e=>abierto(e)&&num(e.prevHonorarios)>0),totalP=r2(ep.reduce((a,e)=>a+num(e.prevHonorarios),0));
  const nada=!S.clientes.length&&!S.expedientes.length;
  return `<div class="top"><div class="tit"><p class="fecha">${cap(fFecha(h,1))}</p><h1>${esc(S.ajustes.despacho.nombre||'Despacho')}</h1></div><div class="acc"><a class="btn ghost solo-movil" href="#ajustes" aria-label="Ajustes">${ICO_AJ}</a></div></div>
- <div class="rapidos"><button class="btn" data-a="nuevoEv">Nueva tarea</button><button class="btn" data-a="nuevoExp">Nuevo expediente</button><button class="btn" data-a="nuevoCli">Nuevo cliente</button><button class="btn" data-a="nuevaFac">Nueva factura</button></div>
  ${nada?`<div class="panel aviso"><h2>Para empezar</h2><p>Añade tu primer cliente o trae los datos de tu programa actual desde <a href="#ajustes">Ajustes, Importar datos</a>.</p></div>`:''}
  ${venc.length?`<h2 class="sec peligro">Tareas con fecha pasada</h2><div class="list agenda">${venc.map(agendaRow).join('')}</div>`:''}
- <h2 class="sec">Próximas dos semanas</h2>${prox.length?`<div class="list agenda">${prox.map(agendaRow).join('')}</div>`:vacio('No hay plazos, señalamientos ni citas en los próximos 14 días.')}
- <h2 class="sec">Pendiente de cobro</h2><a class="panel cobro" href="#facturas"><span class="importe">${eur(totalP)}</span><span class="nota">${fp.length===1?'1 factura sin cobrar del todo':fp.length+' facturas sin cobrar del todo'}</span></a>`};
+ <h2 class="sec">Agenda próximos 30 días</h2>${prox.length?`<div class="list agenda">${prox.map(agendaRow).join('')}</div>`:vacio('No hay tareas pendientes en los próximos 30 días.')}
+ <h2 class="sec">Previsión de honorarios</h2><a class="panel cobro" href="#prevision"><span class="importe">${eur(totalP)}</span><span class="nota">${ep.length===1?'1 expediente abierto':ep.length.toLocaleString('es-ES')+' expedientes abiertos'}</span></a>`};
 
 function estadoCli(){const m={};for(const e of S.expedientes){const x=m[e.clienteId]||(m[e.clienteId]={ab:0,ce:0});if(abierto(e))x.ab++;else x.ce++}return m}
 const filtroCli=(c,m)=>{const x=m[c.id];return FL.cli==='todos'||(FL.cli==='abiertos'?!!(x&&x.ab):FL.cli==='sin'?!x:!!(x&&!x.ab&&x.ce))};
@@ -709,7 +720,7 @@ L.agenda=()=>{const TE=todosEventos().filter(e=>!e.hecho);if(!TE.length)return v
  const q=norm(Q.agenda);const l=TE.filter(e=>{if(!q)return true;const x=expDe(e.expedienteId);return norm([e.titulo,x?.numero,x?.asunto,x&&cliNom(x.clienteId)].join(' ')).includes(q)}).sort(cercania);
  if(!l.length)return vacio('Ninguna tarea coincide con la búsqueda.');
  return `<div class="list agenda"><div class="row ag cabag"><div class="agf">Fecha</div><div class="agx">Expediente</div><div class="agc">Cliente</div><div class="agt">Tarea pendiente</div></div>${l.map(agendaRow).join('')}</div>`};
-V.agenda=()=>cab('Agenda',`<button class="btn pri" data-a="nuevoEv">Nueva tarea</button>`)+`<p class="nota" style="margin-top:-8px">Ordenadas de la más cercana a hoy a la más lejana. Las pasadas se ven en rojo y siguen aquí hasta que las des por terminadas en su expediente.</p>`+buscador('agenda','Buscar por expediente, cliente o tarea…')+`<div id="lst">${L.agenda()}</div>`;
+V.agenda=()=>cab('Agenda',`<button class="btn" data-a="imprimirAgenda">Imprimir</button><button class="btn pri" data-a="nuevoEv">Nueva tarea</button>`)+`<p class="nota" style="margin-top:-8px">Ordenadas de la más cercana a hoy a la más lejana. Las pasadas se ven en rojo y siguen aquí hasta que las des por terminadas en su expediente.</p>`+buscador('agenda','Buscar por expediente, cliente o tarea…')+`<div id="lst">${L.agenda()}</div>`;
 
 FL.prev='importe';
 function prevRow(e){return `<a class="row pv" href="#expediente/${e.id}"><div class="pvx">${esc(e.numero)}</div><div class="pva">${esc(e.asunto&&e.asunto!==e.numero?e.asunto:'—')}</div><div class="pvc">${esc(cliNom(e.clienteId))}</div><div class="pvi">${eur(num(e.prevHonorarios))}</div></a>`}
@@ -718,7 +729,7 @@ L.prevision=()=>{const q=norm(Q.prevision);let l=S.expedientes.filter(e=>abierto
  const o={importe:(a,b)=>num(b.prevHonorarios)-num(a.prevHonorarios),cliente:(a,b)=>cliNom(a.clienteId).localeCompare(cliNom(b.clienteId),'es'),expediente:(a,b)=>String(a.numero).localeCompare(String(b.numero),'es',{numeric:true})}[FL.prev];l.sort(o);
  if(!l.length)return vacio('Ningún expediente coincide con la búsqueda.');const t=l.reduce((s,e)=>s+num(e.prevHonorarios),0);
  return `<div class="panel totprev"><span class="nota">${l.length===1?'1 expediente':l.length.toLocaleString('es-ES')+' expedientes'}</span><span class="importe">${eur(r2(t))}</span></div><div class="list prevl"><div class="row pv cabag"><div class="pvx">Expediente</div><div class="pva">Asunto</div><div class="pvc">Cliente</div><div class="pvi">Importe</div></div>${l.map(prevRow).join('')}</div>`};
-V.prevision=()=>cab('Previsión de honorarios pendientes','','Solo expedientes abiertos')+`<div class="orden"><span class="nota">Ordenar por</span>${chips('prev',[['importe','Importe'],['cliente','Cliente'],['expediente','Expediente']])}</div>`+buscador('prevision','Buscar por expediente, asunto o cliente…')+`<div id="lst">${L.prevision()}</div>`;
+V.prevision=()=>cab('Previsión de honorarios pendientes',`<button class="btn" data-a="imprimirPrev">Imprimir</button>`,'Solo expedientes abiertos')+`<div class="orden"><span class="nota">Ordenar por</span>${chips('prev',[['importe','Importe'],['cliente','Cliente'],['expediente','Expediente']])}</div>`+buscador('prevision','Buscar por expediente, asunto o cliente…')+`<div id="lst">${L.prevision()}</div>`;
 L.facturas=()=>{if(!S.facturas.length)return vacio('Todavía no hay facturas. Pulsa «Nueva factura» para crear la primera.');
  const q=norm(Q.facturas);const l=S.facturas.filter(f=>{const p=tot(f).pend>0.004;return FL.fac==='todas'||(FL.fac==='pend'?p:!p)}).filter(f=>!q||norm([f.numero,cliNom(f.clienteId),expDe(f.expedienteId)?.asunto].join(' ')).includes(q)).sort(cmpFac);
  return l.length?`<div class="list">${l.map(facRow).join('')}</div>`:vacio('No hay facturas con este filtro.')};
@@ -745,7 +756,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='33';
+const VERSION='34';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -1004,6 +1015,13 @@ const ACT={
    if(t&&!/^-?[\d.,\s]+(€|eur|euros)?$/i.test(t)){$('#err').textContent='Escribe solo el importe, por ejemplo 1.500,00';return false}
    e.prevHonorarios=parseImp(t);toast(t?'Previsión guardada: '+eur(e.prevHonorarios):'Previsión borrada')})},
  verActs:id=>{VER_ACT[id]=!VER_ACT[id];render()},
+ imprimirAgenda:()=>{const q=norm(Q.agenda);const l=todosEventos().filter(e=>!e.hecho).filter(e=>{if(!q)return true;const x=expDe(e.expedienteId);return norm([e.titulo,x?.numero,x?.asunto,x&&cliNom(x.clienteId)].join(' ')).includes(q)}).sort(cercania);
+  if(!l.length){toast('No hay tareas que imprimir');return}
+  imprimirLista('Agenda',`${l.length} tareas pendientes, ordenadas de la más cercana a hoy a la más lejana`,[{t:'Fecha'},{t:'Expediente'},{t:'Cliente'},{t:'Tarea pendiente'}],l.map(ev=>{const x=expDe(ev.expedienteId);return[fLarga(ev.fecha)+(ev.hora?' '+ev.hora:''),x?x.numero:'',x?cliNom(x.clienteId):'',ev.titulo]}))},
+ imprimirPrev:()=>{const q=norm(Q.prevision);let l=S.expedientes.filter(e=>abierto(e)&&num(e.prevHonorarios)>0).filter(e=>!q||norm([e.numero,e.asunto,cliNom(e.clienteId)].join(' ')).includes(q));
+  const o={importe:(a,b)=>num(b.prevHonorarios)-num(a.prevHonorarios),cliente:(a,b)=>cliNom(a.clienteId).localeCompare(cliNom(b.clienteId),'es'),expediente:(a,b)=>String(a.numero).localeCompare(String(b.numero),'es',{numeric:true})}[FL.prev];l.sort(o);
+  if(!l.length){toast('No hay importes que imprimir');return}const t=r2(l.reduce((s,e)=>s+num(e.prevHonorarios),0));
+  imprimirLista('Previsión de honorarios pendientes',`${l.length} expedientes abiertos`,[{t:'Expediente'},{t:'Asunto'},{t:'Cliente'},{t:'Importe',r:1}],l.map(e=>[e.numero,e.asunto&&e.asunto!==e.numero?e.asunto:'',cliNom(e.clienteId),eur(num(e.prevHonorarios))]),['','','Total',eur(t)])},
  revisado:id=>{const e=byId('expedientes',id);e.ultimaRevision=hoy();save();render();toast('Última revisión: hoy')},
  mailAct:(id,b)=>mailActuacion(id,b.dataset.act),
  addComp:()=>{const v=$('#nuevoComp').value.trim();if(!v){$('#nuevoComp').focus();return}const l=[...(S.ajustes.companeros||[])];if(l.some(x=>norm(x)===norm(v))){toast('Ese nombre ya está en la lista');return}l.push(v);l.sort((a,b)=>a.localeCompare(b,'es'));S.ajustes.companeros=l;ponContacto('letrado',v,($('#nuevoCompMail')||{}).value?.trim(),($('#nuevoCompTel')||{}).value?.trim());save();render();toast('Letrado añadido')},
@@ -1054,7 +1072,7 @@ function render(){if(!cargado){main.innerHTML='<div class="login"><p class="nota
  if(fbOk&&!authListo){main.innerHTML='<div class="login"><p class="nota">Cargando…</p></div>';return}
  if(fbOk&&!usuario){main.innerHTML=loginHTML();return}
  if(fbOk&&!listo){main.innerHTML='<div class="login"><p class="nota">Cargando tus datos… La primera vez en cada dispositivo hace falta conexión a internet.</p></div>';return}
- const h=location.hash.slice(1)||'clientes';const [v,id]=h.split('/');const secc={cliente:'clientes',expediente:'expedientes',factura:'facturas'}[v]||v;
+ const h=location.hash.slice(1)||'inicio';const [v,id]=h.split('/');const secc={cliente:'clientes',expediente:'expedientes',factura:'facturas'}[v]||v;
  document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('on',a.dataset.v===secc));
  if(migrar())save();
  main.innerHTML=avisoCopiaHTML()+(V[v]||V.inicio)(id);
