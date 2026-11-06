@@ -178,6 +178,10 @@ body.sin-sesion main{margin:0 auto}
 table.mov{font-size:14.5px}
 table.mov th.ing,table.mov th.gas{color:var(--muted)}
 table.mov tr.editable{cursor:pointer}
+.addcos{display:grid;grid-template-columns:1fr 120px 90px auto;gap:8px}
+@media (max-width:640px){.addcos{grid-template-columns:1fr 1fr}.addcos #csT,.addcos .btn{grid-column:1/-1}}
+table.cos .ap{font-weight:600;width:80px}
+table.cos .ap-S{color:var(--ok)}table.cos .ap-P{color:var(--warn)}table.cos .ap-O{color:var(--danger)}
 table.mov tbody tr.editable:hover td{background:var(--bg)}
 .impm,.fm{display:none}
 table.mov .fm{font-size:12px;color:var(--muted)}
@@ -346,7 +350,7 @@ const F={
   {k:'contrario',l:'Parte contraria'},
   {k:'letradoContrario',l:'Letrado contrario',half:1},
   {k:'procurador',l:'Procurador',half:1},
-  {k:'companero',l:'Compañero que lo tramita',t:'companero'},
+  {k:'companero',l:'Letrado propio',t:'companero'},
   {k:'procuradorPropio',l:'Procurador propio',t:'lista',lista:'procuradores'},
   {k:'notas',l:'Notas',t:'area'}],
  evento:[
@@ -415,11 +419,11 @@ function ficha(ent,o,saltar=[]){const cs=campos(ent).filter(f=>!saltar.includes(
   if(g){if(hechos.has(g))continue;hechos.add(g);const vs=cs.filter(x=>(g==='tel'?/^telefono\d?$/:/^email\d?$/).test(x.k)).map(x=>o[x.k]).filter(Boolean).flatMap(v=>String(v).split(/\s*;\s*/)).filter(Boolean);
    pares.push([g==='tel'?'Teléfonos':'Correos',vs.length?vs.map(v=>`<div>${g==='tel'?telHTML(v):`<a href="mailto:${esc(v)}">${esc(v)}</a>`}</div>`).join(''):ND,1,vs.some(v=>String(v).length>24)]);continue}
   if(ent==='cliente'&&f.custom&&/expedient|asunto/.test(nrm2(f.l))){const ab=S.expedientes.filter(e=>e.clienteId===o.id&&abierto(e));pares.push(['Expedientes abiertos',String(ab.length)]);continue}
-  const v=o[f.k];if(v===undefined||v===null||v===''){pares.push([f.l,ND,1,f.t==='area']);continue}
+  const v=o[f.k];if(v===undefined||v===null||v===''){pares.push([f.l,ND,1,f.t==='area'||nrm2(f.l)==='su referencia']);continue}
   if(f.t==='tel')pares.push([f.l,telHTML(v),1,String(v).length>28]);
   else if(f.t==='email')pares.push([f.l,`<a href="mailto:${esc(v)}">${esc(v)}</a>`,1,String(v).length>28]);
   else if(f.t==='date')pares.push([f.l,fFecha(v)]);
-  else pares.push([f.l,String(v),0,f.t==='area'||f.k==='direccion'||String(v).length>28])}
+  else pares.push([f.l,String(v),0,f.t==='area'||f.k==='direccion'||nrm2(f.l)==='su referencia'||String(v).length>28])}
  return datos(pares,1)}
 const PART=['de','del','la','las','los','y','san','santa','da','das','do','dos','van','von','mac','mc'];
 const CLAVE=/^[A-ZÑ0-9]*[*0-9][A-ZÑ0-9*]*-/i;
@@ -427,7 +431,13 @@ function apellidosPrimero(n){n=String(n||'').trim();if(!n||n.includes(','))retur
  let i=t.findIndex(x=>CLAVE.test(x));
  if(i<0){let k=t.length,u=0;while(u<2&&k>1){k--;while(k>1&&PART.includes(norm(t[k-1])))k--;u++}i=k}
  if(i<=0||i>=t.length)return n;return t.slice(i).join(' ')+', '+t.slice(0,i).join(' ')}
-function migrar14(){const a=S.ajustes;if(a.migr>=14)return false;for(const e of S.expedientes)movDesdeActs(e);a.migr=14;return true}
+function migrar15(){const a=S.ajustes;if(a.migr>=15)return false;
+ const l=cfgCampos('expediente');for(const f of l)if(f.k==='companero'&&/compa/i.test(f.l))f.l='Letrado propio';
+ const ref=l.find(f=>f.custom&&nrm2(f.l)==='su referencia');
+ const orden=['clienteId','numero','apertura','estado','materia','asunto','situacion','companero','procuradorPropio'];
+ const prim=orden.map(k=>l.find(f=>f.k===k)).filter(Boolean);if(ref)prim.push(ref);
+ guardarCfg('expediente',[...prim,...l.filter(f=>!prim.includes(f))]);a.migr=15;return true}
+function migrar14(){const a=S.ajustes;if(a.migr>=14)return false;for(const e of S.expedientes)movDesdeActs(e);a.migr=14;migrar15();return true}
 function migrar13(){const a=S.ajustes;if(a.migr>=13)return false;
  for(const c of S.clientes){if(c.letrado)continue;const s=new Set(S.expedientes.filter(e=>e.clienteId===c.id&&abierto(e)&&e.companero).map(e=>e.companero));if(s.size===1)c.letrado=[...s][0]}
  a.migr=13;migrar14();return true}
@@ -444,7 +454,7 @@ function migrar9(){const a=S.ajustes;if(a.migr>=9)return false;
  for(const e of S.expedientes)if(e.estado==='Archiv'+'ado')e.estado='Cerrado';
  for(const c of S.clientes)if(c.tipo!=='Empresa')c.nombre=apellidosPrimero(c.nombre);
  a.migr=9;migrar10();return true}
-function migrar(){const a=S.ajustes;if(a.migr>=13)return migrar14();if(a.migr>=12)return migrar13();if(a.migr>=11)return migrar12();if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
+function migrar(){const a=S.ajustes;if(a.migr>=14)return migrar15();if(a.migr>=13)return migrar14();if(a.migr>=12)return migrar13();if(a.migr>=11)return migrar12();if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
  const quitar=s=>{const n=nrm2(s);return ['banco','iban','bic','entidad','sucursal','dc','cuenta','cuenta contable','cuenta p g c','forma pago','forma de pago','portes','transportista','direccion de envio'].includes(n)||n.includes('envio')||n.includes('bancari')};
  const fuera=((a.campos&&a.campos.cliente)||[]).filter(c=>c.custom&&quitar(c.l)).map(c=>c.k);
  const lista=cfgCampos('cliente').filter(f=>!fuera.includes(f.k));
@@ -474,6 +484,11 @@ function movHTML(e){const l=[...(e.movimientos||[])].sort((a,b)=>String(a.fecha)
  const filas=l.map(m=>{const i=num(m.ingreso),g=num(m.gasto);s=r2(s+i-g);ti+=i;tg+=g;return `<tr class="editable" data-a="editMov" data-id="${e.id}" data-mov="${m.id}" title="Pulsa para modificar"><td class="fc">${fCorta(m.fecha)}</td><td>${esc(m.concepto)}<small class="fm">${fCorta(m.fecha)}</small></td><td class="r ing">${i?eur(i):''}</td><td class="r gas">${g?eur(g):''}</td><td class="r impm ${i-g<0?'gas':'ing'}">${eur(i-g)}</td><td class="r sal${s<0?' neg':''}">${eur(s)}</td><td class="c"><button type="button" class="x" data-a="delMov" data-id="${e.id}" data-mov="${m.id}" aria-label="Borrar movimiento">×</button></td></tr>`}).join('');
  return `<div class="panel"><div class="addmov"><input type="date" id="mvF" value="${hoy()}" aria-label="Fecha"><input id="mvC" placeholder="Concepto" aria-label="Concepto"><input id="mvI" inputmode="decimal" placeholder="Ingreso €" aria-label="Ingreso"><input id="mvG" inputmode="decimal" placeholder="Gasto €" aria-label="Gasto"><button class="btn pri" data-a="addMov" data-id="${e.id}">Añadir</button></div>
  ${l.length?`<div class="tabla"><table class="mov"><thead><tr><th class="fc">Fecha</th><th>Concepto</th><th class="r ing">Ingreso</th><th class="r gas">Gasto</th><th class="r impm">Importe</th><th class="r">Saldo</th><th></th></tr></thead><tbody>${filas}</tbody><tfoot><tr><td class="fc"></td><td>Totales</td><td class="r ing">${eur(r2(ti))}</td><td class="r gas">${eur(r2(tg))}</td><td class="r impm"></td><td class="r sal${s<0?' neg':''}">${eur(s)}</td><td></td></tr></tfoot></table></div>`:'<p class="nota" style="margin:12px 0 0">Sin movimientos.</p>'}</div>`}
+const APROB={S:'S',P:'P',O:'O'};
+function costasHTML(e){const l=e.costas||[];let t=0;
+ const filas=l.map(c=>{const v=num(c.importe);t+=v;return `<tr class="editable" data-a="editCosta" data-id="${e.id}" data-costa="${c.id}" title="Pulsa para modificar"><td>${esc(c.texto)}</td><td class="r">${eur(v)}</td><td class="c ap ap-${esc(c.aprobadas||'')}">${esc(c.aprobadas||'')}</td><td class="c"><button type="button" class="x" data-a="delCosta" data-id="${e.id}" data-costa="${c.id}" aria-label="Borrar">×</button></td></tr>`}).join('');
+ return `<div class="panel"><div class="addcos"><input id="csT" placeholder="Texto" aria-label="Texto"><input id="csI" inputmode="decimal" placeholder="Importe €" aria-label="Importe"><select id="csA" aria-label="Aprobadas">${opt('','S/P/O',1)}${Object.keys(APROB).map(k=>opt(k,k,0)).join('')}</select><button class="btn pri" data-a="addCosta" data-id="${e.id}">Añadir</button></div>
+ ${l.length?`<div class="tabla"><table class="mov cos"><thead><tr><th>Texto</th><th class="r">Importe</th><th class="c">Aprobadas</th><th></th></tr></thead><tbody>${filas}</tbody><tfoot><tr><td>Total</td><td class="r">${eur(r2(t))}</td><td></td><td></td></tr></tfoot></table></div>`:'<p class="nota" style="margin:12px 0 0">Sin costas.</p>'}</div>`}
 function totalesHTML(f,t){return `<table class="tot"><tr><td>Base imponible</td><td class="r">${eur(t.base)}</td></tr><tr><td>IVA ${esc(f.iva)} %</td><td class="r">${eur(t.iva)}</td></tr>${num(f.irpf)?`<tr><td>Retención IRPF ${esc(f.irpf)} %</td><td class="r">−${eur(t.irpf)}</td></tr>`:''}${t.sup?`<tr><td>Suplidos</td><td class="r">${eur(t.sup)}</td></tr>`:''}<tr class="gt"><td>Total</td><td class="r">${eur(t.total)}</td></tr></table>`}
 
 /* ---------- Vistas ---------- */
@@ -515,12 +530,13 @@ V.expediente=id=>{const e=byId('expedientes',id);if(!e)return noEnc('#expediente
  const ev=S.eventos.filter(x=>x.expedienteId===id).sort((a,b)=>(a.hecho-b.hecho)||cmpEv(a,b));
  const act=[...(e.actuaciones||[])].sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
  const fa=S.facturas.filter(f=>f.expedienteId===id).sort(cmpFac);
- return volver('#expedientes','Expedientes')+cab(e.asunto,`<button class="btn" data-a="editExp" data-id="${id}">Editar</button><button class="btn ghost dan" data-a="delExp" data-id="${id}">Borrar</button>`,`${e.asunto&&e.asunto!==e.numero?'Expediente '+esc(e.numero)+', ':''}<a href="#cliente/${e.clienteId}">${esc(cliNom(e.clienteId))}</a>`)+
- ficha('expediente',e,['asunto','numero'])+
+ return volver('#expedientes','Expedientes')+cab('Expediente '+e.numero,`<button class="btn" data-a="editExp" data-id="${id}">Editar</button><button class="btn ghost dan" data-a="delExp" data-id="${id}">Borrar</button>`,`<a href="#cliente/${e.clienteId}">${esc(cliNom(e.clienteId))}</a>`)+
+ ficha('expediente',e,['numero'])+
  sec('Plazos y citas',`<button class="btn sm" data-a="nuevoEv" data-exp="${id}">Añadir</button>`,ev.length?`<div class="list">${ev.map(evRow).join('')}</div>`:vacio('Sin plazos ni citas.'))+
  sec('Actuaciones','',`<div class="panel"><div class="addact"><input type="date" id="actF" value="${hoy()}" aria-label="Fecha"><textarea id="actT" rows="2" placeholder="Escrito presentado, llamada, notificación…" aria-label="Actuación"></textarea><button class="btn pri" data-a="addAct" data-id="${id}">Añadir</button></div>${act.length?`<ol class="tl">${act.map(a=>`<li><time>${fFecha(a.fecha)}${a.hora?', '+esc(a.hora):''}</time><p>${esc(a.texto)}</p>${a.importe?`<p class="actimp ${a.importe<0?'neg':''}">${eur(a.importe)}</p>`:''}<button type="button" class="x" data-a="delAct" data-id="${id}" data-act="${a.id}" aria-label="Borrar actuación">×</button></li>`).join('')}</ol>`:''}</div>`)+
  sec('Previsión de honorarios pendientes','',prevHTML(e))+
- sec('Ingresos y gastos','',movHTML(e))};
+ sec('Ingresos y gastos','',movHTML(e))+
+ sec('Costas','',costasHTML(e))};
 
 L.agenda=()=>{if(!S.eventos.length)return vacio('La agenda está vacía. Pulsa «Nuevo» para apuntar un plazo, un señalamiento o una cita.');
  const q=norm(Q.agenda);const l=S.eventos.filter(e=>FL.ag==='todos'||(FL.ag==='pend'?!e.hecho:e.hecho)).filter(e=>{if(!q)return true;const x=expDe(e.expedienteId);return norm([e.titulo,e.tipo,e.lugar,x?.numero,x?.asunto,x&&cliNom(x.clienteId)].join(' ')).includes(q)}).sort(cmpEv);
@@ -556,7 +572,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='15';
+const VERSION='16';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -755,6 +771,12 @@ const ACT={
  addMov:id=>{const e=byId('expedientes',id),c=$('#mvC').value.trim(),i=parseImp($('#mvI').value),g=parseImp($('#mvG').value);if(!c){$('#mvC').focus();toast('Escribe el concepto');return}if(!i&&!g){$('#mvI').focus();toast('Escribe el ingreso o el gasto');return}
   (e.movimientos=e.movimientos||[]).push({id:uid(),fecha:$('#mvF').value||hoy(),concepto:c,ingreso:i,gasto:g});save();render();toast('Movimiento añadido')},
  delMov:(id,b)=>{if(!confirm('¿Borrar este movimiento?'))return;const e=byId('expedientes',id);e.movimientos=(e.movimientos||[]).filter(m=>m.id!==b.dataset.mov);if(dlg.open)dlg.close();save();render()},
+ addCosta:id=>{const e=byId('expedientes',id),t=$('#csT').value.trim(),i=parseImp($('#csI').value);if(!t){$('#csT').focus();toast('Escribe el texto');return}
+  (e.costas=e.costas||[]).push({id:uid(),texto:t,importe:i,aprobadas:$('#csA').value});save();render();toast('Costas añadidas')},
+ delCosta:(id,b)=>{if(!confirm('¿Borrar esta línea de costas?'))return;const e=byId('expedientes',id);e.costas=(e.costas||[]).filter(c=>c.id!==b.dataset.costa);if(dlg.open)dlg.close();save();render()},
+ editCosta:(id,b)=>{const e=byId('expedientes',id),c=(e.costas||[]).find(x=>x.id===b.dataset.costa);if(!c)return;
+  formModal('Modificar costas',[{k:'texto',l:'Texto',req:1},{k:'importe',l:'Importe (€)',t:'number',half:1},{k:'aprobadas',l:'Aprobadas',t:'select',o:['','S','P','O'],half:1}],{texto:c.texto,importe:num(c.importe)?num(c.importe).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}):'',aprobadas:c.aprobadas||''},
+   v=>{c.texto=v.texto;c.importe=parseImp(v.importe);c.aprobadas=v.aprobadas;toast('Costas modificadas')},`<button type="button" class="btn ghost dan izq" data-a="delCosta" data-id="${id}" data-costa="${c.id}">Borrar</button>`)},
  editMov:(id,b)=>{const e=byId('expedientes',id),m=(e.movimientos||[]).find(x=>x.id===b.dataset.mov);if(!m)return;const f2=n=>num(n)?num(n).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
   formModal('Modificar movimiento',[{k:'fecha',l:'Fecha',t:'date',req:1,half:1},{k:'concepto',l:'Concepto',req:1},{k:'ingreso',l:'Ingreso (€)',t:'number',half:1},{k:'gasto',l:'Gasto (€)',t:'number',half:1}],{fecha:m.fecha,concepto:m.concepto,ingreso:f2(m.ingreso),gasto:f2(m.gasto)},
    v=>{const i=parseImp(v.ingreso),g=parseImp(v.gasto);if(!i&&!g){$('#err').textContent='Escribe el ingreso o el gasto.';return false}m.fecha=v.fecha;m.concepto=v.concepto;m.ingreso=i;m.gasto=g;toast('Movimiento modificado')},
