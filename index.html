@@ -170,6 +170,22 @@ body.sin-sesion main{margin:0 auto}
 .orden{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .orden .chips{margin-bottom:12px}.orden .nota{margin-bottom:12px}
 .mes .cnt{font-weight:400;font-size:13px}
+.prev{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.prev .addact{flex:1;min-width:220px}
+.addmov{display:grid;grid-template-columns:150px 1fr 110px 110px auto;gap:8px}
+@media (max-width:640px){.addmov{grid-template-columns:1fr 1fr}.addmov #mvC,.addmov .btn{grid-column:1/-1}}
+.tabla{overflow-x:auto;margin-top:14px}
+table.mov{font-size:14.5px}
+table.mov th.ing,table.mov th.gas{color:var(--muted)}
+table.mov tr.editable{cursor:pointer}
+table.mov tbody tr.editable:hover td{background:var(--bg)}
+.impm,.fm{display:none}
+table.mov .fm{font-size:12px;color:var(--muted)}
+@media (max-width:640px){table.mov .fc{display:none}table.mov .fm{display:block}table.mov{font-size:13px}table.mov .c{width:24px}table.mov .x{width:24px;height:26px;font-size:17px}.panel:has(table.mov){padding:14px 10px}table.mov .ing:not(.impm),table.mov .gas:not(.impm){display:none}table.mov .impm{display:table-cell}table.mov td,table.mov th{padding:7px 4px}}
+table.mov td,table.mov th{padding:7px 6px}
+table.mov tfoot td{font-weight:600;border-bottom:0;border-top:1.5px solid var(--ink)}
+table.mov .ing{color:var(--ok)}table.mov .gas{color:var(--danger)}table.mov .sal.neg{color:var(--danger)}
+table.mov .c{width:36px}table.mov .x{position:static;width:30px;height:30px}
 #print{display:none}
 @media print{
  .app,#toast,dialog{display:none!important}
@@ -280,7 +296,7 @@ const r2=n=>Math.round(n*100)/100;
 const hoy=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const dias=f=>Math.round((new Date(f+'T00:00')-new Date(hoy()+'T00:00'))/864e5);
 const fFecha=(f,largo)=>{if(!f)return '';const d=new Date(f+'T00:00');if(isNaN(d))return f;return d.toLocaleDateString('es-ES',largo?{weekday:'long',day:'numeric',month:'long',year:'numeric'}:{day:'numeric',month:'short',year:'numeric'})};
-const eur=n=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(n||0);
+const eur=n=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(n||0);
 const byId=(col,id)=>id?S[col].find(x=>x.id===id):undefined;
 const cliNom=id=>byId('clientes',id)?.nombre||'Sin cliente';
 const expDe=id=>byId('expedientes',id);
@@ -319,10 +335,11 @@ const F={
   {k:'notas',l:'Notas',t:'area'}],
  expediente:[
   {k:'clienteId',l:'Cliente',t:'cliente',req:1},
-  {k:'asunto',l:'Asunto',req:1,ph:'Ej.: Reclamación de cantidad'},
+  {k:'asunto',l:'Asunto',req:1,t:'lista',lista:'asuntos'},
   {k:'numero',l:'Nº de expediente',half:1,ph:'Se asigna solo'},
   {k:'apertura',l:'Fecha de apertura',t:'date',half:1},
   {k:'materia',l:'Materia',t:'select',o:['',...MATERIAS],half:1},
+  {k:'situacion',l:'Situación del expediente',t:'lista',lista:'situaciones'},
   {k:'estado',l:'Estado',t:'select',o:['Abierto','Cerrado'],half:1},
   {k:'juzgado',l:'Juzgado o tribunal'},
   {k:'autos',l:'Nº de procedimiento (autos)'},
@@ -330,6 +347,7 @@ const F={
   {k:'letradoContrario',l:'Letrado contrario',half:1},
   {k:'procurador',l:'Procurador',half:1},
   {k:'companero',l:'Compañero que lo tramita',t:'companero'},
+  {k:'procuradorPropio',l:'Procurador propio',t:'lista',lista:'procuradores'},
   {k:'notas',l:'Notas',t:'area'}],
  evento:[
   {k:'tipo',l:'Tipo',t:'select',o:TIPOS_EV,half:1},
@@ -346,6 +364,7 @@ function campo(f,v){const id='f_'+f.k;v=v??'';let inp;
  else if(f.t==='cliente')inp=`<select id="${id}">${opt('','Elige un cliente',!v)}${[...S.clientes].sort(cmpNom).map(c=>opt(c.id,c.nombre,c.id===v)).join('')}</select>`;
  else if(f.t==='expediente')inp=`<select id="${id}">${opt('','Sin expediente',!v)}${expOrden().map(e=>opt(e.id,expLabel(e),e.id===v)).join('')}</select>`;
  else if(f.t==='companero'){const l=[...(S.ajustes.companeros||[])];if(v&&!l.includes(v))l.unshift(v);inp=`<select id="${id}">${opt('','Sin asignar',!v)}${l.map(x=>opt(x,x,x===v)).join('')}</select>`}
+ else if(f.t==='lista'){const l=[...((S.ajustes.listas||{})[f.lista]||[])];if(v&&!l.includes(v))l.unshift(v);inp=`<select id="${id}" data-lista="${f.lista}">${opt('','Elige…',!v)}${l.map(x=>opt(x,x,x===v)).join('')}${opt('__nuevo','➕ Añadir nuevo…',false)}</select>`}
  else if(f.t==='area')inp=`<textarea id="${id}" rows="3">${esc(v)}</textarea>`;
  else if(f.t==='number')inp=`<input id="${id}" type="text" inputmode="decimal" value="${esc(v)}"${f.ph?` placeholder="${esc(f.ph)}"`:''}>`;
  else inp=`<input id="${id}" type="${f.t||'text'}" value="${esc(v)}"${f.ph?` placeholder="${esc(f.ph)}"`:''}>`;
@@ -354,7 +373,7 @@ function campo(f,v){const id='f_'+f.k;v=v??'';let inp;
 /* ---------- Datos configurables de las fichas ---------- */
 const ENT={cliente:'Clientes',expediente:'Expedientes',evento:'Plazos y citas'};
 const TIPOS_CAMPO=[['text','Texto'],['area','Texto largo'],['date','Fecha'],['number','Número'],['tel','Teléfono'],['email','Correo electrónico'],['select','Lista de opciones']];
-const nomTipo=f=>f.t==='cliente'?'Cliente':f.t==='expediente'?'Expediente':f.t==='companero'?'Lista de letrados':(TIPOS_CAMPO.find(x=>x[0]===(f.t||'text'))||[0,'Texto'])[1];
+const nomTipo=f=>f.t==='cliente'?'Cliente':f.t==='expediente'?'Expediente':f.t==='companero'?'Lista de letrados':f.t==='lista'?'Lista desplegable':(TIPOS_CAMPO.find(x=>x[0]===(f.t||'text'))||[0,'Texto'])[1];
 function cfgCampos(ent){const base=F[ent],cfg=(S.ajustes.campos||{})[ent];if(!cfg)return base.map(f=>({...f}));const out=[];
  for(const c of cfg){const b=base.find(f=>f.k===c.k);if(b)out.push({...b,l:c.l||b.l,oculto:!!c.oculto&&!b.req});else if(c.custom)out.push({k:c.k,l:c.l,t:c.t||'text',o:c.o,custom:1,oculto:!!c.oculto,half:['date','number','tel','select'].includes(c.t)?1:0})}
  base.forEach((b,bi)=>{if(out.some(f=>f.k===b.k))return;let pos=-1;for(let j=bi-1;j>=0&&pos<0;j--)pos=out.findIndex(f=>f.k===base[j].k);out.splice(pos+1,0,{...b})});return out}
@@ -408,9 +427,10 @@ function apellidosPrimero(n){n=String(n||'').trim();if(!n||n.includes(','))retur
  let i=t.findIndex(x=>CLAVE.test(x));
  if(i<0){let k=t.length,u=0;while(u<2&&k>1){k--;while(k>1&&PART.includes(norm(t[k-1])))k--;u++}i=k}
  if(i<=0||i>=t.length)return n;return t.slice(i).join(' ')+', '+t.slice(0,i).join(' ')}
+function migrar14(){const a=S.ajustes;if(a.migr>=14)return false;for(const e of S.expedientes)movDesdeActs(e);a.migr=14;return true}
 function migrar13(){const a=S.ajustes;if(a.migr>=13)return false;
  for(const c of S.clientes){if(c.letrado)continue;const s=new Set(S.expedientes.filter(e=>e.clienteId===c.id&&abierto(e)&&e.companero).map(e=>e.companero));if(s.size===1)c.letrado=[...s][0]}
- a.migr=13;return true}
+ a.migr=13;migrar14();return true}
 function migrar12(){const a=S.ajustes;if(a.migr>=12)return false;
  const l=cfgCampos('cliente');for(const f of l){if(['telefono3','telefono4','telefono5'].includes(f.k))f.oculto=true;if(f.custom&&(nrm2(f.l)==='codigo'||/expedient|asunto/.test(nrm2(f.l))))f.oculto=true}guardarCfg('cliente',l);
  for(const c of S.clientes){const extra=['telefono3','telefono4','telefono5'].map(k=>c[k]).filter(Boolean);if(extra.length){const dest=c.telefono2?'telefono2':c.telefono?'telefono2':'telefono';c[dest]=[c[dest],...extra].filter(Boolean).join('; ')}delete c.telefono3;delete c.telefono4;delete c.telefono5}
@@ -424,7 +444,7 @@ function migrar9(){const a=S.ajustes;if(a.migr>=9)return false;
  for(const e of S.expedientes)if(e.estado==='Archiv'+'ado')e.estado='Cerrado';
  for(const c of S.clientes)if(c.tipo!=='Empresa')c.nombre=apellidosPrimero(c.nombre);
  a.migr=9;migrar10();return true}
-function migrar(){const a=S.ajustes;if(a.migr>=12)return migrar13();if(a.migr>=11)return migrar12();if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
+function migrar(){const a=S.ajustes;if(a.migr>=13)return migrar14();if(a.migr>=12)return migrar13();if(a.migr>=11)return migrar12();if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
  const quitar=s=>{const n=nrm2(s);return ['banco','iban','bic','entidad','sucursal','dc','cuenta','cuenta contable','cuenta p g c','forma pago','forma de pago','portes','transportista','direccion de envio'].includes(n)||n.includes('envio')||n.includes('bancari')};
  const fuera=((a.campos&&a.campos.cliente)||[]).filter(c=>c.custom&&quitar(c.l)).map(c=>c.k);
  const lista=cfgCampos('cliente').filter(f=>!fuera.includes(f.k));
@@ -443,6 +463,17 @@ function expDeCli(id){const ord=(a,b)=>String(a.apertura||'9999').localeCompare(
 const expRowCli=e=>{const j=limpiaJuzgado(e.juzgado),solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?(j||'Sin juzgado'):e.asunto)}</div>${!solo&&j?`<div class="s">${esc(j)}</div>`:''}</div>${abierto(e)?'':'<span class="tag">Cerrado</span>'}</a>`};
 function expRow(e){const solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?cliNom(e.clienteId):e.asunto)}</div><div class="s">${esc([solo?'':cliNom(e.clienteId),e.materia,limpiaJuzgado(e.juzgado)].filter(Boolean).join(', '))}</div></div>${e.companero?`<span class="abog">${esc(e.companero)}</span>`:''}${e.estado==='Cerrado'?'<span class="tag">Cerrado</span>':''}</a>`}
 function facRow(f){const t=tot(f),x=expDe(f.expedienteId);return `<a class="row" href="#factura/${f.id}"><div class="num">${esc(f.numero)}</div><div class="txt"><div class="t">${esc(cliNom(f.clienteId))}</div><div class="s">${fFecha(f.fecha)}${x?', '+esc(x.asunto):''}</div></div><div class="imp"><b>${eur(t.total)}</b>${t.pend>0.004?`<small class="pend">Pendiente ${eur(t.pend)}</small>`:'<small class="ok">Cobrada</small>'}</div></a>`}
+function movDesdeActs(e){const acts=(e.actuaciones||[]).filter(a=>num(a.importe));if(!acts.length)return 0;
+ e.movimientos=e.movimientos||[];const ya=new Set(e.movimientos.map(m=>m.k).filter(Boolean));let n=0,cargos=0,abonos=0;
+ for(const a of acts){const v=num(a.importe);if(v<0){cargos+=-v;continue}abonos+=v;const k=a.fecha+'|'+a.texto;
+  if(!ya.has(k)){e.movimientos.push({id:uid(),k,fecha:a.fecha,concepto:String(a.texto||'').replace(/^Entrega a cuenta de honorarios:\s*/i,'').trim()||'Entrega a cuenta',ingreso:r2(v),gasto:0});ya.add(k);n++}}
+ if(e.prevHonorarios===undefined&&cargos)e.prevHonorarios=r2(Math.max(0,cargos-abonos));return n}
+const fCorta=f=>{if(!f)return '';const d=new Date(f+'T00:00');return isNaN(d)?f:d.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit'})};
+function prevHTML(e){const v=num(e.prevHonorarios);return `<div class="panel"><div class="prev">${v?`<span class="importe">${eur(v)}</span>`:'<span class="nota">Sin previsión</span>'}<div class="addact" style="grid-template-columns:1fr auto"><input id="prevH" inputmode="decimal" value="${v?v.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}):''}" placeholder="Importe en €" aria-label="Previsión de honorarios pendientes"><button class="btn" data-a="guardaPrev" data-id="${e.id}">Guardar</button></div></div></div>`}
+function movHTML(e){const l=[...(e.movimientos||[])].sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));let s=0,ti=0,tg=0;
+ const filas=l.map(m=>{const i=num(m.ingreso),g=num(m.gasto);s=r2(s+i-g);ti+=i;tg+=g;return `<tr class="editable" data-a="editMov" data-id="${e.id}" data-mov="${m.id}" title="Pulsa para modificar"><td class="fc">${fCorta(m.fecha)}</td><td>${esc(m.concepto)}<small class="fm">${fCorta(m.fecha)}</small></td><td class="r ing">${i?eur(i):''}</td><td class="r gas">${g?eur(g):''}</td><td class="r impm ${i-g<0?'gas':'ing'}">${eur(i-g)}</td><td class="r sal${s<0?' neg':''}">${eur(s)}</td><td class="c"><button type="button" class="x" data-a="delMov" data-id="${e.id}" data-mov="${m.id}" aria-label="Borrar movimiento">×</button></td></tr>`}).join('');
+ return `<div class="panel"><div class="addmov"><input type="date" id="mvF" value="${hoy()}" aria-label="Fecha"><input id="mvC" placeholder="Concepto" aria-label="Concepto"><input id="mvI" inputmode="decimal" placeholder="Ingreso €" aria-label="Ingreso"><input id="mvG" inputmode="decimal" placeholder="Gasto €" aria-label="Gasto"><button class="btn pri" data-a="addMov" data-id="${e.id}">Añadir</button></div>
+ ${l.length?`<div class="tabla"><table class="mov"><thead><tr><th class="fc">Fecha</th><th>Concepto</th><th class="r ing">Ingreso</th><th class="r gas">Gasto</th><th class="r impm">Importe</th><th class="r">Saldo</th><th></th></tr></thead><tbody>${filas}</tbody><tfoot><tr><td class="fc"></td><td>Totales</td><td class="r ing">${eur(r2(ti))}</td><td class="r gas">${eur(r2(tg))}</td><td class="r impm"></td><td class="r sal${s<0?' neg':''}">${eur(s)}</td><td></td></tr></tfoot></table></div>`:'<p class="nota" style="margin:12px 0 0">Sin movimientos.</p>'}</div>`}
 function totalesHTML(f,t){return `<table class="tot"><tr><td>Base imponible</td><td class="r">${eur(t.base)}</td></tr><tr><td>IVA ${esc(f.iva)} %</td><td class="r">${eur(t.iva)}</td></tr>${num(f.irpf)?`<tr><td>Retención IRPF ${esc(f.irpf)} %</td><td class="r">−${eur(t.irpf)}</td></tr>`:''}${t.sup?`<tr><td>Suplidos</td><td class="r">${eur(t.sup)}</td></tr>`:''}<tr class="gt"><td>Total</td><td class="r">${eur(t.total)}</td></tr></table>`}
 
 /* ---------- Vistas ---------- */
@@ -488,7 +519,8 @@ V.expediente=id=>{const e=byId('expedientes',id);if(!e)return noEnc('#expediente
  ficha('expediente',e,['asunto','numero'])+
  sec('Plazos y citas',`<button class="btn sm" data-a="nuevoEv" data-exp="${id}">Añadir</button>`,ev.length?`<div class="list">${ev.map(evRow).join('')}</div>`:vacio('Sin plazos ni citas.'))+
  sec('Actuaciones','',`<div class="panel"><div class="addact"><input type="date" id="actF" value="${hoy()}" aria-label="Fecha"><textarea id="actT" rows="2" placeholder="Escrito presentado, llamada, notificación…" aria-label="Actuación"></textarea><button class="btn pri" data-a="addAct" data-id="${id}">Añadir</button></div>${act.length?`<ol class="tl">${act.map(a=>`<li><time>${fFecha(a.fecha)}${a.hora?', '+esc(a.hora):''}</time><p>${esc(a.texto)}</p>${a.importe?`<p class="actimp ${a.importe<0?'neg':''}">${eur(a.importe)}</p>`:''}<button type="button" class="x" data-a="delAct" data-id="${id}" data-act="${a.id}" aria-label="Borrar actuación">×</button></li>`).join('')}</ol>`:''}</div>`)+
- sec('Facturas',`<button class="btn sm" data-a="nuevaFac" data-exp="${id}">Nueva factura</button>`,fa.length?`<div class="list">${fa.map(facRow).join('')}</div>`:vacio('Sin facturas.'))};
+ sec('Previsión de honorarios pendientes','',prevHTML(e))+
+ sec('Ingresos y gastos','',movHTML(e))};
 
 L.agenda=()=>{if(!S.eventos.length)return vacio('La agenda está vacía. Pulsa «Nuevo» para apuntar un plazo, un señalamiento o una cita.');
  const q=norm(Q.agenda);const l=S.eventos.filter(e=>FL.ag==='todos'||(FL.ag==='pend'?!e.hecho:e.hecho)).filter(e=>{if(!q)return true;const x=expDe(e.expedienteId);return norm([e.titulo,e.tipo,e.lugar,x?.numero,x?.asunto,x&&cliNom(x.clienteId)].join(' ')).includes(q)}).sort(cmpEv);
@@ -524,7 +556,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='13';
+const VERSION='15';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -552,7 +584,7 @@ function leerFichas(filas){const recs=[];let cur=null,modo=null,cabs=[],prevLab=
  const rows=recs.map(r=>Object.fromEntries(cols.map(c=>[c,r[c]||''])));
  if(!rows.length)throw new Error('No se han encontrado fichas de clientes en el archivo.');
  return{dest:'clientes',cols,rows,ocultas:['Nombre','Apellidos','Nombre común'],aviso:`Archivo en formato de ficha: se han encontrado ${rows.length} clientes.`}}
-function parseImp(s){s=String(s??'').replace(/[€\s]/g,'');if(!s)return 0;if(/,\d{1,2}$/.test(s))s=s.replace(/\./g,'').replace(',','.');else s=s.replace(/,/g,'');return +s||0}
+function parseImp(s){s=String(s??'').replace(/[€\s]/g,'');if(!s)return 0;if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');else if(/^-?\d{1,3}(\.\d{3})+$/.test(s))s=s.replace(/\./g,'');return +s||0}
 const limpiaJuzgado=s=>String(s||'').split(/\s*;\s*/).map(p=>p.replace(/^\s*(\d+\s*[ºª°]?\.?\s*[-–:]?\s*)+(?=[A-Za-zÁÉÍÓÚÑáéíóúñ])/,'').replace(/\s*[-–(]\s*\d{3,}\)?\s*$/,'').trim()).filter(Boolean).join('; ');
 const sinPref=s=>String(s||'').replace(/^\s*\d+\s*-\s*/,'').replace(/\s*-\s*$/,'').trim();
 const codDe=s=>{const m=String(s||'').match(/^\s*([A-ZÑ0-9]*[*0-9][A-ZÑ0-9*]*)-\s*\S/i);return m?m[1]:''};
@@ -632,7 +664,7 @@ function importar(){const d=IMP.dest,m=Object.assign({},IMP.map),ent=ENTD[d];
    if(e){pon(e,o);act++}else{o.asunto=o.asunto||o.numero;o.numero=o.numero||sigExp();e={id:uid(),actuaciones:[],...o};S.expedientes.push(e);n++}
    if(r.__acts){e.actuaciones=e.actuaciones||[];const ya=new Set(e.actuaciones.map(a=>a.fecha+'|'+a.texto)),h0=hoy();
     for(const a of r.__acts){const key=a.fecha+'|'+a.texto;if(!ya.has(key)){const na={id:uid(),fecha:a.fecha,texto:a.texto};if(a.hora)na.hora=a.hora;if(a.importe)na.importe=a.importe;e.actuaciones.push(na);ya.add(key);nAct++}
-     if(a.fecha>=h0&&!S.eventos.some(x=>x.expedienteId===e.id&&x.fecha===a.fecha&&x.titulo===a.desc)){S.eventos.push({id:uid(),hecho:false,tipo:a.hora?'Señalamiento':'Tarea',titulo:a.desc,fecha:a.fecha,hora:a.hora||'',lugar:'',notas:'',expedienteId:e.id});nEv++}}}}
+     if(a.fecha>=h0&&!S.eventos.some(x=>x.expedienteId===e.id&&x.fecha===a.fecha&&x.titulo===a.desc)){S.eventos.push({id:uid(),hecho:false,tipo:a.hora?'Señalamiento':'Tarea',titulo:a.desc,fecha:a.fecha,hora:a.hora||'',lugar:'',notas:'',expedienteId:e.id});nEv++}}movDesdeActs(e)}}
   else{o.fecha=toISO(o.fecha);if(!o.fecha||!(o.titulo||o.tipo)){sin++;continue}const x=o.expedienteId?buscaExp(o.expedienteId):null;o.expedienteId=x?x.id:'';
    const tp=TIPOS_EV.find(t=>norm(o.tipo).includes(norm(t).slice(0,5)));o.titulo=o.titulo||o.tipo;o.tipo=tp||(o.tipo?cap(o.tipo):'Plazo');const hm=String(o.hora).match(/(\d{1,2}):(\d{2})/);o.hora=hm?hm[1].padStart(2,'0')+':'+hm[2]:'';
    S.eventos.push({id:uid(),hecho:false,...o});n++}}
@@ -643,6 +675,7 @@ V.ajustes=()=>{const d=S.ajustes.despacho,a=S.ajustes;
  sec('Datos del despacho','',`<div class="panel"><p class="nota">Aparecen en la cabecera de las facturas.</p><div class="grid">${[['nombre','Nombre del despacho o del letrado'],['nif','NIF',1],['telefono','Teléfono',1],['direccion','Dirección completa'],['email','Correo electrónico',1],['iban','IBAN para transferencias',1]].map(([k,l,h])=>`<div class="fld${h?' half':''}"><label for="d_${k}">${l}</label><input id="d_${k}" data-d="${k}" value="${esc(d[k])}"></div>`).join('')}
  <div class="fld half"><label for="a_serie">Serie de facturas</label><input id="a_serie" value="${esc(a.serie)}" placeholder="Ej.: F"></div><div class="fld half"><label for="a_iva">IVA por defecto (%)</label><input id="a_iva" inputmode="decimal" value="${esc(a.iva)}"></div><div class="fld half"><label for="a_irpf">Retención IRPF por defecto (%)</label><input id="a_irpf" inputmode="decimal" value="${esc(a.irpf)}"></div></div><button class="btn pri" data-a="guardarAj">Guardar datos</button></div>`)+
  sec('Letrados','',companerosHTML())+
+ sec('Listas desplegables','',listasHTML())+
  sec('Datos de las fichas','',camposHTML())+
  sec('Importar datos','',importHTML())+
  sec('Copia de seguridad','',`<div class="panel"><p>Descarga un archivo con todos tus datos o recupera una copia anterior.</p><div class="rapidos"><button class="btn" data-a="exportar">Descargar copia</button><label class="btn">Recuperar copia<input type="file" accept=".json,application/json" data-c="restaurar" hidden></label></div></div>`)+
@@ -650,6 +683,9 @@ V.ajustes=()=>{const d=S.ajustes.despacho,a=S.ajustes;
  sec('Borrar todo','',`<div class="panel"><p>Elimina todos los clientes, expedientes, plazos y facturas${fbOk&&usuario?' de tu cuenta, en todos tus dispositivos':' de este dispositivo'}. Descarga antes una copia si la necesitas.</p><button class="btn dan" data-a="borrarTodo">Borrar todos los datos</button></div>`)+
  `<p class="nota pie">Versión ${VERSION}. ${S.clientes.length} clientes, ${S.expedientes.length} expedientes, ${S.eventos.length} plazos y citas, ${S.facturas.length} facturas.</p>`};
 
+const LISTAS={asuntos:'Asuntos',situaciones:'Situaciones',procuradores:'Procuradores'};let LE='asuntos';
+function listasHTML(){const l=(S.ajustes.listas||{})[LE]||[];
+ return `<div class="panel"><p class="nota">Elementos de los desplegables del expediente. También puedes añadirlos desde el propio desplegable con «➕ Añadir nuevo…».</p><div class="chips">${Object.entries(LISTAS).map(([k,n])=>`<button type="button" class="chip${LE===k?' on':''}" data-a="le" data-v="${k}">${n} <span class="cnt">${((S.ajustes.listas||{})[k]||[]).length}</span></button>`).join('')}</div>${l.length?`<div class="list" style="margin-bottom:12px">${l.map((n,i)=>`<div class="row"><div class="txt"><div class="t">${esc(n)}</div></div><button type="button" class="btn sm ghost dan" data-a="quitaLista" data-i="${i}">Quitar</button></div>`).join('')}</div>`:''}<div class="addact" style="grid-template-columns:1fr auto"><input id="nuevoLista" placeholder="Nuevo elemento" aria-label="Nuevo elemento"><button class="btn pri" data-a="addLista">Añadir</button></div></div>`}
 function companerosHTML(){const l=S.ajustes.companeros||[];
  return `<div class="panel"><p class="nota">Letrados que tramitan los asuntos. Asigna uno a cada cliente en su ficha («Editar» › Letrado) y se aplicará a todos sus expedientes abiertos. También puedes cambiarlo en un expediente concreto.</p>${l.length?`<div class="list" style="margin-bottom:12px">${l.map((n,i)=>`<div class="row"><div class="txt"><div class="t">${esc(n)}</div></div><button type="button" class="btn sm ghost dan" data-a="quitaComp" data-i="${i}">Quitar</button></div>`).join('')}</div>`:''}<div class="addact" style="grid-template-columns:1fr auto"><input id="nuevoComp" placeholder="Nombre y apellidos" aria-label="Nombre del compañero"><button class="btn pri" data-a="addComp">Añadir</button></div></div>`}
 let CE='cliente';
@@ -712,6 +748,17 @@ const ACT={
  quitaLinea:(id,b)=>{b.closest('.linea').remove();recalc()},
  ce:(id,b)=>{CE=b.dataset.v;render()},
  verEC:id=>{VER_EC[id]=!VER_EC[id];render()},
+ le:(id,b)=>{LE=b.dataset.v;render()},
+ addLista:()=>{const v=$('#nuevoLista').value.trim();if(!v){$('#nuevoLista').focus();return}const ls=S.ajustes.listas=Object.assign({},S.ajustes.listas),l=[...(ls[LE]||[])];if(l.some(x=>norm(x)===norm(v))){toast('Ya está en la lista');return}l.push(v);l.sort((a,b)=>a.localeCompare(b,'es'));ls[LE]=l;save();render()},
+ quitaLista:(id,b)=>{const ls=S.ajustes.listas=Object.assign({},S.ajustes.listas),l=[...(ls[LE]||[])],n=l[+b.dataset.i];if(!confirm(`¿Quitar «${n}» de la lista? Los expedientes que ya lo tengan lo conservan.`))return;l.splice(+b.dataset.i,1);ls[LE]=l;save();render()},
+ guardaPrev:id=>{const e=byId('expedientes',id);e.prevHonorarios=parseImp($('#prevH').value);save();render();toast('Previsión guardada')},
+ addMov:id=>{const e=byId('expedientes',id),c=$('#mvC').value.trim(),i=parseImp($('#mvI').value),g=parseImp($('#mvG').value);if(!c){$('#mvC').focus();toast('Escribe el concepto');return}if(!i&&!g){$('#mvI').focus();toast('Escribe el ingreso o el gasto');return}
+  (e.movimientos=e.movimientos||[]).push({id:uid(),fecha:$('#mvF').value||hoy(),concepto:c,ingreso:i,gasto:g});save();render();toast('Movimiento añadido')},
+ delMov:(id,b)=>{if(!confirm('¿Borrar este movimiento?'))return;const e=byId('expedientes',id);e.movimientos=(e.movimientos||[]).filter(m=>m.id!==b.dataset.mov);if(dlg.open)dlg.close();save();render()},
+ editMov:(id,b)=>{const e=byId('expedientes',id),m=(e.movimientos||[]).find(x=>x.id===b.dataset.mov);if(!m)return;const f2=n=>num(n)?num(n).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
+  formModal('Modificar movimiento',[{k:'fecha',l:'Fecha',t:'date',req:1,half:1},{k:'concepto',l:'Concepto',req:1},{k:'ingreso',l:'Ingreso (€)',t:'number',half:1},{k:'gasto',l:'Gasto (€)',t:'number',half:1}],{fecha:m.fecha,concepto:m.concepto,ingreso:f2(m.ingreso),gasto:f2(m.gasto)},
+   v=>{const i=parseImp(v.ingreso),g=parseImp(v.gasto);if(!i&&!g){$('#err').textContent='Escribe el ingreso o el gasto.';return false}m.fecha=v.fecha;m.concepto=v.concepto;m.ingreso=i;m.gasto=g;toast('Movimiento modificado')},
+   `<button type="button" class="btn ghost dan izq" data-a="delMov" data-id="${id}" data-mov="${m.id}">Borrar</button>`)},
  addComp:()=>{const v=$('#nuevoComp').value.trim();if(!v){$('#nuevoComp').focus();return}const l=[...(S.ajustes.companeros||[])];if(l.some(x=>norm(x)===norm(v))){toast('Ese nombre ya está en la lista');return}l.push(v);l.sort((a,b)=>a.localeCompare(b,'es'));S.ajustes.companeros=l;save();render();toast('Compañero añadido')},
  quitaComp:(id,b)=>{const l=[...(S.ajustes.companeros||[])],n=l[+b.dataset.i];const u=S.expedientes.filter(e=>e.companero===n).length,uc=S.clientes.filter(c=>c.letrado===n).length;if(!confirm(`¿Quitar a ${n} de la lista?${u||uc?` Tiene ${uc} clientes y ${u} expedientes asignados, que quedarán sin asignar.`:''}`))return;l.splice(+b.dataset.i,1);S.ajustes.companeros=l;S.expedientes.forEach(e=>{if(e.companero===n)e.companero=''});S.clientes.forEach(c=>{if(c.letrado===n)c.letrado=''});save();render()},
  subeCampo:(id,b)=>moverCampo(+b.dataset.i,-1),
@@ -732,6 +779,11 @@ const ACT={
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b)return;const f=ACT[b.dataset.a];if(f){e.preventDefault();f(b.dataset.id,b,e)}});
 document.addEventListener('submit',e=>{if(e.target.id!=='loginF')return;e.preventDefault();const em=$('#lg_e').value.trim(),pw=$('#lg_p').value,er=$('#lg_err'),b=e.target.querySelector('[type=submit]');er.textContent='';if(!em||!pw){er.textContent='Escribe el correo y la contraseña.';return}b.disabled=true;b.textContent='Entrando…';auth.signInWithEmailAndPassword(em,pw).catch(x=>{b.disabled=false;b.textContent='Entrar';er.textContent=errAuth(x.code)})});
 document.addEventListener('input',e=>{const q=e.target.dataset&&e.target.dataset.q;if(q){Q[q]=e.target.value;$('#lst').innerHTML=L[q]()}});
+document.addEventListener('change',e=>{const t=e.target;if(!t.dataset||!t.dataset.lista||t.value!=='__nuevo')return;
+ const n=(prompt('Escribe el nuevo elemento de la lista')||'').trim();if(!n){t.value='';return}
+ const ls=S.ajustes.listas=Object.assign({},S.ajustes.listas),k=t.dataset.lista,l=[...(ls[k]||[])];
+ if(!l.some(x=>norm(x)===norm(n))){l.push(n);l.sort((a,b)=>a.localeCompare(b,'es'))}ls[k]=l;save();
+ const o=document.createElement('option');o.value=o.textContent=n;t.insertBefore(o,t.querySelector('option[value="__nuevo"]'));t.value=n});
 document.addEventListener('change',async e=>{const t=e.target,c=t.dataset&&t.dataset.c;if(!c)return;
  if(c==='hecho'){const ev=byId('eventos',t.dataset.id);if(!ev)return;ev.hecho=t.checked;save();render();toast(t.checked?'Marcado como hecho':'Marcado como pendiente')}
  else if(c==='impDest'){IMP.dest=t.value;IMP.map=adivinar(IMP.cols,IMP.dest);IMP.nuevos={};render()}
