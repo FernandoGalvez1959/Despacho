@@ -498,22 +498,13 @@ function migrar9(){const a=S.ajustes;if(a.migr>=9)return false;
  for(const e of S.expedientes)if(e.estado==='Archiv'+'ado')e.estado='Cerrado';
  for(const c of S.clientes)if(c.tipo!=='Empresa')c.nombre=apellidosPrimero(c.nombre);
  a.migr=9;migrar10();return true}
-const expMalos=()=>S.expedientes.filter(e=>{const n=String(e.numero||'').trim();return !n||/\s/.test(n)||!/\d/.test(n)});
+const expMalos=()=>S.expedientes.filter(e=>{const n=String(e.numero||'').trim();return !n||/[\n,]/.test(n)||n.length>30||!/\d/.test(n)});
+function partirNumero(t){const ls=String(t||'').split(/\r?\n/),l0=ls[0]||'';const m=l0.match(/^\s*(.*?)\s+-(?:\s+(.*?))?\s*$/);
+ return{numero:(m?m[1]:l0).trim(),asunto:(m&&m[2]||'').trim(),desc:ls.slice(1).map(s=>s.trim()).filter(Boolean).join('\n')}}
+const claveCorta=v=>(String(v||'').match(/(\d{5,})\s*$/)||[])[1]||'';
 const claveNum=v=>norm(v).replace(/[\s\-_.\/]/g,'');
 const claveAct=a=>(a.fecha||'')+'|'+norm(a.texto).replace(/\s+/g,' ');
 function unirDuplicados(){let ne=0,na=0,nc=0;
- // Expedientes con el mismo número
- const g={};for(const e of S.expedientes){const k=claveNum(e.numero);if(!k)continue;(g[k]=g[k]||[]).push(e)}
- const puntos=e=>Object.values(e).filter(v=>v!==''&&v!=null).length+(e.companero?5:0)+(e.situacion?5:0)+((e.movimientos||[]).length+(e.costas||[]).length)*2+(e.actuaciones||[]).filter(a=>a.pendiente).length*3;
- for(const k in g){const l=g[k];if(l.length<2)continue;l.sort((a,b)=>puntos(b)-puntos(a));const keep=l[0];keep.numero=String(keep.numero).trim();
-  for(const o of l.slice(1)){for(const f in o){if(['id','actuaciones','movimientos','costas'].includes(f))continue;if((keep[f]===undefined||keep[f]===''||keep[f]===null)&&o[f]!==''&&o[f]!=null)keep[f]=o[f]}
-   keep.actuaciones=[...(keep.actuaciones||[]),...(o.actuaciones||[])];
-   const km=new Set((keep.movimientos||[]).map(m=>m.k||(m.fecha+'|'+m.concepto+'|'+m.ingreso+'|'+m.gasto)));keep.movimientos=[...(keep.movimientos||[]),...(o.movimientos||[]).filter(m=>!km.has(m.k||(m.fecha+'|'+m.concepto+'|'+m.ingreso+'|'+m.gasto)))];
-   const kc=new Set((keep.costas||[]).map(c=>c.texto+'|'+c.importe));keep.costas=[...(keep.costas||[]),...(o.costas||[]).filter(c=>!kc.has(c.texto+'|'+c.importe))];
-   for(const ev of S.eventos)if(ev.expedienteId===o.id)ev.expedienteId=keep.id;for(const f of S.facturas)if(f.expedienteId===o.id)f.expedienteId=keep.id;
-   S.expedientes=S.expedientes.filter(x=>x!==o);ne++}}
- // Actuaciones repetidas dentro de un expediente (se conserva la pendiente o la modificada)
- for(const e of S.expedientes){const vis=new Map(),res=[];for(const a of e.actuaciones||[]){const k=claveAct(a);if(vis.has(k)){const p=vis.get(k);if(a.pendiente&&!p.pendiente)Object.assign(p,{pendiente:true,fechaTarea:a.fechaTarea,horaTarea:a.horaTarea});na++;continue}vis.set(k,a);res.push(a)}if(e.actuaciones)e.actuaciones=res}
  // Clientes creados de más al importar expedientes (solo nombre, sin más datos)
  const tk=s=>norm(sinCod(s)).replace(/[^a-z0-9ñ ]/g,' ').split(/\s+/).filter(Boolean).sort().join(' ');
  const minimo=c=>Object.keys(c).every(k=>['id','creado','nombre','tipo','letrado'].includes(k)||c[k]===''||c[k]==null);
@@ -525,11 +516,37 @@ function unirDuplicados(){let ne=0,na=0,nc=0;
     for(const e of S.expedientes)if(e.clienteId===c.id)e.clienteId=keep.id;for(const f of S.facturas)if(f.clienteId===c.id)f.clienteId=keep.id;S.clientes=S.clientes.filter(x=>x!==c);nc++}}}
  const gc={};for(const c of S.clientes)(gc[tk(c.nombre)]=gc[tk(c.nombre)]||[]).push(c);
  for(const k in gc){const l=gc[k];if(l.length<2)continue;const full=l.find(c=>!minimo(c))||l[0];for(const c of l){if(c===full||!minimo(c))continue;if(!full.letrado&&c.letrado)full.letrado=c.letrado;for(const e of S.expedientes)if(e.clienteId===c.id)e.clienteId=full.id;for(const f of S.facturas)if(f.clienteId===c.id)f.clienteId=full.id;S.clientes=S.clientes.filter(x=>x!==c);nc++}}
+
+ // Expedientes con el mismo número
+ const g={};for(const e of S.expedientes){let k=claveNum(e.numero);if(!k)continue;k+='|'+(e.clienteId||'');(g[k]=g[k]||[]).push(e)}
+ const puntos=e=>Object.values(e).filter(v=>v!==''&&v!=null).length+(e.companero?5:0)+(e.situacion?5:0)+((e.movimientos||[]).length+(e.costas||[]).length)*2+(e.actuaciones||[]).filter(a=>a.pendiente).length*3;
+ for(const k in g){const l=g[k];if(l.length<2)continue;l.sort((a,b)=>puntos(b)-puntos(a));const keep=l[0];keep.numero=String(keep.numero).trim();
+  for(const o of l.slice(1)){for(const f in o){if(['id','actuaciones','movimientos','costas'].includes(f))continue;if((keep[f]===undefined||keep[f]===''||keep[f]===null)&&o[f]!==''&&o[f]!=null)keep[f]=o[f]}
+   keep.actuaciones=[...(keep.actuaciones||[]),...(o.actuaciones||[])];
+   const km=new Set((keep.movimientos||[]).map(m=>m.k||(m.fecha+'|'+m.concepto+'|'+m.ingreso+'|'+m.gasto)));keep.movimientos=[...(keep.movimientos||[]),...(o.movimientos||[]).filter(m=>!km.has(m.k||(m.fecha+'|'+m.concepto+'|'+m.ingreso+'|'+m.gasto)))];
+   const kc=new Set((keep.costas||[]).map(c=>c.texto+'|'+c.importe));keep.costas=[...(keep.costas||[]),...(o.costas||[]).filter(c=>!kc.has(c.texto+'|'+c.importe))];
+   for(const ev of S.eventos)if(ev.expedienteId===o.id)ev.expedienteId=keep.id;for(const f of S.facturas)if(f.expedienteId===o.id)f.expedienteId=keep.id;
+   S.expedientes=S.expedientes.filter(x=>x!==o);ne++}}
+ // Mismo cliente y misma parte numérica final (p. ej. "2607-F2016012" y "2016012")
+ {const g2={};for(const e of S.expedientes){const k=claveCorta(e.numero);if(!k||!e.clienteId)continue;(g2[e.clienteId+'|'+k]=g2[e.clienteId+'|'+k]||[]).push(e)}
+  for(const k in g2){const l=g2[k];if(l.length<2)continue;l.sort((a,b)=>puntos(b)-puntos(a));const keep=l[0],largo=l.map(e=>String(e.numero).trim()).sort((a,b)=>b.length-a.length)[0];keep.numero=largo;
+   for(const o of l.slice(1)){for(const f in o){if(['id','numero','actuaciones','movimientos','costas'].includes(f))continue;if((keep[f]===undefined||keep[f]===''||keep[f]===null)&&o[f]!==''&&o[f]!=null)keep[f]=o[f]}
+    keep.actuaciones=[...(keep.actuaciones||[]),...(o.actuaciones||[])];
+    const km=new Set((keep.movimientos||[]).map(m=>m.k||(m.fecha+'|'+m.concepto+'|'+m.ingreso+'|'+m.gasto)));keep.movimientos=[...(keep.movimientos||[]),...(o.movimientos||[]).filter(m=>!km.has(m.k||(m.fecha+'|'+m.concepto+'|'+m.ingreso+'|'+m.gasto)))];
+    const kc=new Set((keep.costas||[]).map(c=>c.texto+'|'+c.importe));keep.costas=[...(keep.costas||[]),...(o.costas||[]).filter(c=>!kc.has(c.texto+'|'+c.importe))];
+    for(const ev of S.eventos)if(ev.expedienteId===o.id)ev.expedienteId=keep.id;for(const f of S.facturas)if(f.expedienteId===o.id)f.expedienteId=keep.id;
+    S.expedientes=S.expedientes.filter(x=>x!==o);ne++}}}
+ // Actuaciones repetidas dentro de un expediente (se conserva la pendiente o la modificada)
+ for(const e of S.expedientes){const vis=new Map(),res=[];for(const a of e.actuaciones||[]){const k=claveAct(a);if(vis.has(k)){const p=vis.get(k);if(a.pendiente&&!p.pendiente)Object.assign(p,{pendiente:true,fechaTarea:a.fechaTarea,horaTarea:a.horaTarea});na++;continue}vis.set(k,a);res.push(a)}if(e.actuaciones)e.actuaciones=res}
  return{ne,na,nc}}
-function migrar19(){const a=S.ajustes;if(a.migr>=19)return false;for(const e of S.expedientes)e.estado=estadoN(e);a.migr=19;return true}
+function migrar21(){const a=S.ajustes;if(a.migr>=21)return false;let n=0;
+ for(const e of S.expedientes){const t=String(e.numero||'');if(/\n/.test(t)||/\s-(\s|$)/.test(t)){const pn=partirNumero(t);if(pn.numero&&/\d/.test(pn.numero)&&pn.numero.length<=30){if(!e.asunto||e.asunto===t)e.asunto=pn.asunto||pn.numero;e.numero=pn.numero;n++}}}
+ const r=unirDuplicados();a.migr=21;if(n||r.ne)setTimeout(()=>toast(`Corregidos ${n} números de expediente. `+textoDup(r)),900);return true}
+function migrar20(){const a=S.ajustes;if(a.migr>=20)return false;const r=unirDuplicados();a.migr=20;if(r.ne||r.na||r.nc)setTimeout(()=>toast(textoDup(r)),700);migrar21();return true}
+function migrar19(){const a=S.ajustes;if(a.migr>=19)return false;for(const e of S.expedientes)e.estado=estadoN(e);a.migr=19;migrar20();return true}
 function migrar18(){const a=S.ajustes;if(a.migr>=18)return false;const r=unirDuplicados();a.migr=18;if(r.ne||r.na||r.nc)setTimeout(()=>toast(textoDup(r)),600);migrar19();return true}
 const textoDup=r=>r.ne||r.na||r.nc?`Unidos: ${r.ne} expedientes duplicados, ${r.na} actuaciones repetidas y ${r.nc} clientes duplicados.`:'No se han encontrado duplicados.';
-function migrar(){if(S.ajustes.migr>=18)return migrar19();if(S.ajustes.migr>=17)return migrar18();const a=S.ajustes;if(a.migr>=16)return migrar17();if(a.migr>=15)return migrar16();if(a.migr>=14)return migrar15();if(a.migr>=13)return migrar14();if(a.migr>=12)return migrar13();if(a.migr>=11)return migrar12();if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
+function migrar(){if(S.ajustes.migr>=20)return migrar21();if(S.ajustes.migr>=19)return migrar20();if(S.ajustes.migr>=18)return migrar19();if(S.ajustes.migr>=17)return migrar18();const a=S.ajustes;if(a.migr>=16)return migrar17();if(a.migr>=15)return migrar16();if(a.migr>=14)return migrar15();if(a.migr>=13)return migrar14();if(a.migr>=12)return migrar13();if(a.migr>=11)return migrar12();if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
  const quitar=s=>{const n=nrm2(s);return ['banco','iban','bic','entidad','sucursal','dc','cuenta','cuenta contable','cuenta p g c','forma pago','forma de pago','portes','transportista','direccion de envio'].includes(n)||n.includes('envio')||n.includes('bancari')};
  const fuera=((a.campos&&a.campos.cliente)||[]).filter(c=>c.custom&&quitar(c.l)).map(c=>c.k);
  const lista=cfgCampos('cliente').filter(f=>!fuera.includes(f.k));
@@ -657,7 +674,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='24';
+const VERSION='26';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -700,7 +717,7 @@ function leerExpedientes(filas){const F2=filas.map(r=>r.map(x=>String(x??'').tri
  const asig=fila=>{const o={};fila.forEach((v,i)=>{if(!v||!cabs.length)return;let c=cabs[0];for(const x of cabs)if(x.i<=i)c=x;const k=(c.g?c.g+'|':'')+c.n;o[k]=o[k]?o[k]+' '+v:v});return o};
  F2.forEach((fila,idx)=>{const no=fila.filter(Boolean);if(!no.length)return;const nn=no.map(nrm2);
   if(esIni(fila)){if(cur)recs.push(cur);let lin='';for(let j=idx-1;j>=0;j--){const r=F2[j].filter(Boolean);if(!r.length)continue;const rn=r.map(nrm2);if(rn.every(n=>cabecera.has(n))||rn.some(n=>n.startsWith('listado de expedientes')))continue;lin=r.join(' ');break}
-   const NUM=/^\s*(\S+)\s+-\s*(.*)$/,m=lin.match(NUM)||ult.match(NUM)||[0,lin||ult,''];cur={numero:m[1].trim(),asunto:m[2].trim(),datos:{},personas:{propios:[],contrarios:[],comunes:[]},inst:[],acts:[]};sec='datos'}
+   const pn=partirNumero(lin||ult);cur={numero:pn.numero,asunto:pn.asunto,desc:pn.desc,datos:{},personas:{propios:[],contrarios:[],comunes:[]},inst:[],acts:[]};sec='datos'}
   if(no.length===1&&sigIni(idx)){ult=no[0];return}
   if(!cur||nn.every(n=>cabecera.has(n))||nn.some(n=>n.startsWith('listado de expedientes')))return;
   if(sec==='datos'&&!nn.includes('propios')&&no.some(s=>s.includes(':'))){for(const s of no){const k=s.indexOf(':');if(k>0)cur.datos[nrm2(s.slice(0,k))]=s.slice(k+1).trim()}return}
@@ -715,7 +732,7 @@ function leerExpedientes(filas){const F2=filas.map(r=>r.map(x=>String(x??'').tri
    cur.acts.push({fecha:f,hora:hm?hm[1].padStart(2,'0')+':'+hm[2]:'',tipo:(o.tipo||'').trim(),desc:(o.descripcion||'').trim(),importe:parseImp(o.importe)})}});
  if(cur)recs.push(cur);
  if(!recs.length)throw new Error('No se han encontrado expedientes en el archivo.');
- const COLS=['Número','Asunto','Cliente','Fecha de inicio','Estado','Su referencia','Juzgado','Nº de procedimiento','Tipo de expediente','Cuantía inicial','Cuantía final','Parte contraria','Letrado contrario','Procurador','Abogado','Otros intervinientes'];
+ const COLS=['Número','Asunto','Descripción del asunto','Cliente','Fecha de inicio','Estado','Su referencia','Juzgado','Nº de procedimiento','Tipo de expediente','Cuantía inicial','Cuantía final','Parte contraria','Letrado contrario','Procurador','Abogado','Otros intervinientes'];
  const rows=recs.map(r=>{const p=r.personas,cli=p.propios.find(x=>/client/i.test(x.rel))||p.propios[0];
   const esLet=x=>/abogad|letrad/i.test(x.rel),esProc=x=>/procurad/i.test(x.rel);
   const contr=p.contrarios.filter(x=>!esLet(x)&&!esProc(x)),letC=p.contrarios.filter(esLet),proc=[...p.propios,...p.comunes].filter(esProc),abog=p.propios.filter(esLet);
@@ -724,7 +741,7 @@ function leerExpedientes(filas){const F2=filas.map(r=>r.map(x=>String(x??'').tri
   const j=k=>r.inst.map(i=>sinPref(i[k])).filter(Boolean).join('; ');
   const cu=k=>r.inst.map(i=>parseImp(i[k])).filter(Boolean).map(eur).join('; ');
   const ref=r.datos['s referencia']||'';
-  const o={'Número':r.numero,'Asunto':r.asunto||r.numero,'Cliente':cli?cli.nombre.trim():'','Fecha de inicio':r.datos['fecha de inicio']||'','Estado':r.datos['estado del asunto']||'','Su referencia':ref==='0'?'':ref,
+  const o={'Número':r.numero,'Asunto':r.asunto||r.numero,'Descripción del asunto':r.desc||'','Cliente':cli?cli.nombre.trim():'','Fecha de inicio':r.datos['fecha de inicio']||'','Estado':r.datos['estado del asunto']||'','Su referencia':ref==='0'?'':ref,
    'Juzgado':limpiaJuzgado(j('organismo')),'Nº de procedimiento':j('instancia'),'Tipo de expediente':j('tipo de expediente'),'Cuantía inicial':cu('cuantia inicial'),'Cuantía final':cu('cuantia final'),
    'Parte contraria':contr.map(con).join('; '),'Letrado contrario':letC.map(con).join('; '),'Procurador':proc.map(con).join('; '),'Abogado':abog.map(x=>sinCod(x.nombre)).join('; '),'Otros intervinientes':otros.join('; ')};
   o.__acts=r.acts.map(a=>({fecha:a.fecha,hora:a.hora,texto:(a.tipo&&!/^libre$/i.test(a.tipo)?a.tipo+': ':'')+a.desc,importe:a.importe,desc:a.desc||a.tipo}));return o});
@@ -753,7 +770,9 @@ function importar(){const d=IMP.dest,m=Object.assign({},IMP.map),ent=ENTD[d];
  let act=0,nAct=0,nEv=0;
  const tok=s=>norm(s).replace(/[^a-z0-9ñ ]/g,' ').split(/\s+/).filter(Boolean).sort().join(' ');
  const buscaCli=v=>{const nv=norm(v);if(!nv)return null;const tv=tok(v);return S.clientes.find(c=>(c.nif&&norm(c.nif)===nv)||norm(c.nombre)===nv)||S.clientes.find(c=>tok(c.nombre)===tv)||S.clientes.find(c=>Object.keys(c).some(k=>k.startsWith('x_')&&norm(c[k])===nv))||S.clientes.find(c=>tok(sinCod(c.nombre))===tok(sinCod(v)))};
- const buscaExp=v=>{const nv=claveNum(v);if(!nv)return null;return S.expedientes.find(e=>claveNum(e.numero)===nv)||S.expedientes.find(e=>e.autos&&norm(e.autos)===norm(v))};
+ const buscaExp=(v,cid)=>{const nv=claveNum(v);if(!nv)return null;const kc=claveCorta(v);
+   if(cid)return S.expedientes.find(e=>e.clienteId===cid&&claveNum(e.numero)===nv)||(kc?S.expedientes.find(e=>e.clienteId===cid&&claveCorta(e.numero)===kc):null);
+   return S.expedientes.find(e=>claveNum(e.numero)===nv)||S.expedientes.find(e=>e.autos&&norm(e.autos)===norm(v))};
  const fCod=cs.find(f=>f.custom&&nrm2(f.l)==='codigo');
  const existeCli=o=>(fCod&&o[fCod.k]&&S.clientes.find(c=>norm(c[fCod.k])===norm(o[fCod.k])))||(o.nif&&S.clientes.find(c=>c.nif&&norm(c.nif)===norm(o.nif)))||S.clientes.find(c=>tok(c.nombre)===tok(o.nombre));
  const pon=(dst,o)=>{for(const k in o)if(o[k]!==''&&o[k]!=null)dst[k]=o[k]};
@@ -763,7 +782,8 @@ function importar(){const d=IMP.dest,m=Object.assign({},IMP.map),ent=ENTD[d];
   else if(d==='expedientes'){if(!o.asunto&&!o.numero){sin++;continue}
    let c=o.clienteId?buscaCli(o.clienteId):null;if(!c&&o.clienteId){c={id:uid(),creado:hoy(),nombre:o.clienteId,tipo:'Particular'};S.clientes.push(c);nuevosCli++}
    o.clienteId=c?c.id:'';o.apertura=toISO(o.apertura);o.estado=estadoN(o);o.materia=o.materia?cap(o.materia.toLowerCase()):'';
-   let e=o.numero?buscaExp(o.numero):null;
+   let e=o.numero?buscaExp(o.numero,o.clienteId):null;
+   if(e&&String(o.numero).trim().length<String(e.numero).trim().length)o.numero=e.numero;
    if(e){pon(e,o);act++}else{o.asunto=o.asunto||o.numero;o.numero=o.numero||sigExp();e={id:uid(),actuaciones:[],...o};S.expedientes.push(e);n++}
    if(r.__acts){e.actuaciones=e.actuaciones||[];const ya=new Set(e.actuaciones.map(a=>a.fecha+'|'+a.texto)),h0=hoy();
     for(const a of r.__acts){const key=a.fecha+'|'+a.texto;if(!ya.has(key)){const na={id:uid(),fecha:a.fecha,texto:a.texto};if(a.hora)na.hora=a.hora;if(a.importe)na.importe=a.importe;e.actuaciones.push(na);ya.add(key);nAct++}
@@ -771,6 +791,13 @@ function importar(){const d=IMP.dest,m=Object.assign({},IMP.map),ent=ENTD[d];
   else{o.fecha=toISO(o.fecha);if(!o.fecha||!(o.titulo||o.tipo)){sin++;continue}const x=o.expedienteId?buscaExp(o.expedienteId):null;o.expedienteId=x?x.id:'';
    const tp=TIPOS_EV.find(t=>norm(o.tipo).includes(norm(t).slice(0,5)));o.titulo=o.titulo||o.tipo;o.tipo=tp||(o.tipo?cap(o.tipo):'Plazo');const hm=String(o.hora).match(/(\d{1,2}):(\d{2})/);o.hora=hm?hm[1].padStart(2,'0')+':'+hm[2]:'';
    S.eventos.push({id:uid(),hecho:false,...o});n++}}
+ if(d==='expedientes'){const grupos={};for(const r of IMP.rows){const k=claveNum(r[m.numero]||r['Número']);if(!k)continue;(grupos[k]=grupos[k]||[]).push(r)}
+  for(const k in grupos){const l=grupos[k];if(l.length<2)continue;
+   const info=l.map(r=>{const c=buscaCli(val(r,'clienteId'));const e=c?S.expedientes.find(x=>x.clienteId===c.id&&claveNum(x.numero)===k):null;return{e,keys:new Set((r.__acts||[]).map(a=>a.fecha+'|'+a.texto))}});
+   for(const a of info){if(!a.e)continue;const ajenas=new Set();for(const b of info)if(b!==a)for(const x of b.keys)if(!a.keys.has(x))ajenas.add(x);
+    if(ajenas.size){a.e.actuaciones=(a.e.actuaciones||[]).filter(x=>!ajenas.has(x.fecha+'|'+x.texto));a.e.movimientos=(a.e.movimientos||[]).filter(x=>!x.k||!ajenas.has(x.k))}}}}
+ // Los asuntos importados pasan a la lista desplegable
+ if(d==='expedientes'){const ls=S.ajustes.listas=Object.assign({},S.ajustes.listas),l=new Set(ls.asuntos||[]);for(const e of S.expedientes){const a=String(e.asunto||'').trim();if(a&&a!==e.numero&&a.length<=60)l.add(a)}ls.asuntos=[...l].sort((a,b)=>a.localeCompare(b,'es'))}
  const dup=unirDuplicados();
  save();Object.assign(IMP,{cols:[],rows:[],map:{},nombre:'',nuevos:{},ocultas:[],aviso:''});render();
  toast(`Nuevos: ${n}.`+(dup.ne||dup.na||dup.nc?' '+textoDup(dup):'')+(act?` Actualizados: ${act}.`:'')+(nAct?` Actuaciones: ${nAct}.`:'')+(nEv?` Añadidos ${nEv} plazos futuros a la agenda.`:'')+(creados?` Añadidos ${creados} datos nuevos a la ficha.`:'')+(rep?` ${rep} ya existían y se han saltado.`:'')+(sin?` ${sin} filas sin datos suficientes.`:'')+(nuevosCli?` Se han creado ${nuevosCli} clientes nuevos.`:''))}
