@@ -179,6 +179,14 @@ table.mov{font-size:14.5px}
 table.mov th.ing,table.mov th.gas{color:var(--muted)}
 table.mov tr.editable{cursor:pointer}
 .row.tarea .xt{position:static;flex:none;width:36px;height:36px;font-size:22px}
+.actpend{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px}
+.actpend label{display:flex;align-items:center;gap:8px;font-size:15px;cursor:pointer}
+.actpend input[type=checkbox]{width:22px;height:22px;min-height:0;accent-color:var(--accent)}
+.actpend input[type=date]{width:auto}
+.tl .actx{cursor:pointer}.tl .actx:hover p{color:var(--accent)}
+.tl .estado-t{font-size:13px;color:var(--muted)}
+.tl li.pte .estado-t{color:var(--warn);font-weight:600}
+.tl li.pte::before{background:var(--warn)}
 .ok-t{flex:none;width:40px;height:40px;border-radius:10px;border:1.5px solid var(--ok);background:transparent;color:var(--ok);font-size:20px;font-weight:600;cursor:pointer}
 .ok-t:hover{background:var(--ok);color:var(--surface)}
 .addcos{display:grid;grid-template-columns:1fr 120px 90px auto;gap:8px}
@@ -434,11 +442,17 @@ function apellidosPrimero(n){n=String(n||'').trim();if(!n||n.includes(','))retur
  let i=t.findIndex(x=>CLAVE.test(x));
  if(i<0){let k=t.length,u=0;while(u<2&&k>1){k--;while(k>1&&PART.includes(norm(t[k-1])))k--;u++}i=k}
  if(i<=0||i>=t.length)return n;return t.slice(i).join(' ')+', '+t.slice(0,i).join(' ')}
+function migrar17(){const a=S.ajustes;if(a.migr>=17)return false;
+ for(const ev of S.eventos)ev.hecho=true;
+ const l=cfgCampos('expediente'),bus=n=>l.find(f=>f.custom&&nrm2(f.l)===n),tipo=bus('tipo de expediente');if(tipo)tipo.oculto=true;
+ const mover=['cuantia inicial','cuantia final'].map(bus).filter(Boolean);let res=l;
+ if(mover.length){res=l.filter(f=>!mover.includes(f));const ref=bus('su referencia');let i=res.indexOf(ref);if(i<0)i=res.findIndex(f=>f.k==='procuradorPropio');res.splice(i+1,0,...mover)}
+ guardarCfg('expediente',res);a.migr=17;return true}
 function migrar16(){const a=S.ajustes;if(a.migr>=16)return false;
  const l=cfgCampos('expediente'),bus=n=>l.find(f=>f.custom&&nrm2(f.l)===n);
  const mover=['tipo de expediente','cuantia inicial','cuantia final'].map(bus).filter(Boolean);
  if(mover.length){const resto=l.filter(f=>!mover.includes(f)),ref=bus('su referencia');let i=resto.indexOf(ref);if(i<0)i=resto.findIndex(f=>f.k==='procuradorPropio');resto.splice(i+1,0,...mover);guardarCfg('expediente',resto)}
- a.migr=16;return true}
+ a.migr=16;migrar17();return true}
 function migrar15(){const a=S.ajustes;if(a.migr>=15)return false;
  const l=cfgCampos('expediente');for(const f of l)if(f.k==='companero'&&/compa/i.test(f.l))f.l='Letrado propio';
  const ref=l.find(f=>f.custom&&nrm2(f.l)==='su referencia');
@@ -462,7 +476,7 @@ function migrar9(){const a=S.ajustes;if(a.migr>=9)return false;
  for(const e of S.expedientes)if(e.estado==='Archiv'+'ado')e.estado='Cerrado';
  for(const c of S.clientes)if(c.tipo!=='Empresa')c.nombre=apellidosPrimero(c.nombre);
  a.migr=9;migrar10();return true}
-function migrar(){const a=S.ajustes;if(a.migr>=15)return migrar16();if(a.migr>=14)return migrar15();if(a.migr>=13)return migrar14();if(a.migr>=12)return migrar13();if(a.migr>=11)return migrar12();if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
+function migrar(){const a=S.ajustes;if(a.migr>=16)return migrar17();if(a.migr>=15)return migrar16();if(a.migr>=14)return migrar15();if(a.migr>=13)return migrar14();if(a.migr>=12)return migrar13();if(a.migr>=11)return migrar12();if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
  const quitar=s=>{const n=nrm2(s);return ['banco','iban','bic','entidad','sucursal','dc','cuenta','cuenta contable','cuenta p g c','forma pago','forma de pago','portes','transportista','direccion de envio'].includes(n)||n.includes('envio')||n.includes('bancari')};
  const fuera=((a.campos&&a.campos.cliente)||[]).filter(c=>c.custom&&quitar(c.l)).map(c=>c.k);
  const lista=cfgCampos('cliente').filter(f=>!fuera.includes(f.k));
@@ -472,6 +486,10 @@ function migrar(){const a=S.ajustes;if(a.migr>=15)return migrar16();if(a.migr>=1
   if(c.telefono&&String(c.telefono).includes('; ')&&!c.telefono2){const p=String(c.telefono).split('; ');c.telefono=p[0];for(let i=1;i<p.length&&i<5;i++)c['telefono'+(i+1)]=i===4?p.slice(4).join('; '):p[i]}}
  a.migr=6;migrar9();return true}
 const textoBusq=o=>norm(Object.entries(o).filter(([k])=>k!=='id'&&!k.endsWith('Id')).map(([,v])=>typeof v==='object'?'':v).join(' '));
+function tareasActs(){const r=[];for(const e of S.expedientes)for(const a of e.actuaciones||[])if(a.pendiente)r.push({id:'act|'+e.id+'|'+a.id,titulo:a.texto,fecha:a.fechaTarea||a.fecha,hora:a.horaTarea||'',tipo:'Tarea',expedienteId:e.id,hecho:false,_act:1});return r}
+const todosEventos=()=>[...S.eventos,...tareasActs()];
+function actDe(id){const [,ei,ai]=String(id).split('|'),e=byId('expedientes',ei);return e?{e,a:(e.actuaciones||[]).find(x=>x.id===ai)}:{}}
+function tareaActRow(e,a){return `<div class="row tarea"><div class="txt" data-a="editAct" data-id="${e.id}" data-act="${a.id}"><div class="t">${esc(a.texto)}</div><div class="s">${fFecha(a.fechaTarea||a.fecha)}${a.horaTarea?' a las '+esc(a.horaTarea):''}</div></div><button type="button" class="ok-t" data-a="terminaAct" data-id="${e.id}" data-act="${a.id}" aria-label="Dar por terminada" title="Dar por terminada">✓</button></div>`}
 function tareaRow(e){return `<div class="row tarea"><div class="txt" data-a="editEv" data-id="${e.id}"><div class="t">${esc(e.titulo)}</div><div class="s">${esc(e.tipo||'')}, ${fFecha(e.fecha)}${e.hora?' a las '+esc(e.hora):''}${e.lugar?', '+esc(e.lugar):''}</div></div><button type="button" class="ok-t" data-a="terminaTarea" data-id="${e.id}" aria-label="Dar por terminada" title="Dar por terminada: pasa a Actuaciones">✓</button><button type="button" class="x xt" data-a="borraTarea" data-id="${e.id}" aria-label="Borrar tarea" title="Borrar (si se apuntó por error)">×</button></div>`}
 function evRow(e){const d=dias(e.fecha),a=Math.abs(d),x=expDe(e.expedienteId);
  const cls=e.hecho?'hecho':d<=0?'urg':d<=3?'pronto':'';
@@ -479,7 +497,7 @@ function evRow(e){const d=dias(e.fecha),a=Math.abs(d),x=expDe(e.expedienteId);
  return `<div class="row${e.hecho?' is-hecho':''}"><label class="chk" title="Marcar como hecho"><input type="checkbox" data-c="hecho" data-id="${e.id}"${e.hecho?' checked':''} aria-label="Hecho"></label><div class="dias ${cls}">${blq}</div><div class="txt" data-a="editEv" data-id="${e.id}"><div class="t">${esc(e.titulo)}</div><div class="s">${esc(e.tipo||'')}, ${fFecha(e.fecha)}${e.hora?' a las '+esc(e.hora):''}${e.lugar?', '+esc(e.lugar):''}</div>${x?`<div class="s">Exp. ${esc(x.numero)}, ${esc(cliNom(x.clienteId))}</div>`:''}</div></div>`}
 const abierto=e=>(e.estado||'Abierto')==='Abierto';
 function expDeCli(id){const ord=(a,b)=>String(a.apertura||'9999').localeCompare(String(b.apertura||'9999'))||String(a.numero).localeCompare(String(b.numero),'es',{numeric:true});const l=S.expedientes.filter(e=>e.clienteId===id);return [...l.filter(abierto).sort(ord),...l.filter(e=>!abierto(e)).sort(ord)]}
-const expRowCli=e=>{const j=limpiaJuzgado(e.juzgado),solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?(j||'Sin juzgado'):e.asunto)}</div>${!solo&&j?`<div class="s">${esc(j)}</div>`:''}</div>${abierto(e)?'':'<span class="tag">Cerrado</span>'}</a>`};
+const expRowCli=e=>{const j=limpiaJuzgado(e.juzgado),solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?(j||'Sin juzgado'):e.asunto)}</div><div class="s">${esc([e.situacion?'Situación: '+e.situacion:'Sin situación',solo?'':j].filter(Boolean).join(' · '))}</div></div>${abierto(e)?'':'<span class="tag">Cerrado</span>'}</a>`};
 function expRow(e){const solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?cliNom(e.clienteId):e.asunto)}</div><div class="s">${esc([solo?'':cliNom(e.clienteId),e.materia,limpiaJuzgado(e.juzgado)].filter(Boolean).join(', '))}</div></div>${e.companero?`<span class="abog">${esc(e.companero)}</span>`:''}${e.estado==='Cerrado'?'<span class="tag">Cerrado</span>':''}</a>`}
 function facRow(f){const t=tot(f),x=expDe(f.expedienteId);return `<a class="row" href="#factura/${f.id}"><div class="num">${esc(f.numero)}</div><div class="txt"><div class="t">${esc(cliNom(f.clienteId))}</div><div class="s">${fFecha(f.fecha)}${x?', '+esc(x.asunto):''}</div></div><div class="imp"><b>${eur(t.total)}</b>${t.pend>0.004?`<small class="pend">Pendiente ${eur(t.pend)}</small>`:'<small class="ok">Cobrada</small>'}</div></a>`}
 function movDesdeActs(e){const acts=(e.actuaciones||[]).filter(a=>num(a.importe));if(!acts.length)return 0;
@@ -502,7 +520,7 @@ function totalesHTML(f,t){return `<table class="tot"><tr><td>Base imponible</td>
 
 /* ---------- Vistas ---------- */
 const V={},L={};
-V.inicio=()=>{const h=hoy();const pend=S.eventos.filter(e=>!e.hecho).sort(cmpEv);const venc=pend.filter(e=>e.fecha<h);const prox=pend.filter(e=>e.fecha>=h&&dias(e.fecha)<=14);
+V.inicio=()=>{const h=hoy();const pend=todosEventos().filter(e=>!e.hecho).sort(cmpEv);const venc=pend.filter(e=>e.fecha<h);const prox=pend.filter(e=>e.fecha>=h&&dias(e.fecha)<=14);
  const fp=S.facturas.map(tot).filter(t=>t.pend>0.004);const totalP=fp.reduce((a,t)=>a+t.pend,0);
  const nada=!S.clientes.length&&!S.expedientes.length;
  return `<div class="top"><div class="tit"><p class="fecha">${cap(fFecha(h,1))}</p><h1>${esc(S.ajustes.despacho.nombre||'Despacho')}</h1></div><div class="acc"><a class="btn ghost solo-movil" href="#ajustes" aria-label="Ajustes">${ICO_AJ}</a></div></div>
@@ -536,19 +554,21 @@ L.expedientes=()=>{if(!S.expedientes.length)return vacio('Todavía no hay expedi
  return l.length?`<div class="list">${l.map(expRow).join('')}</div>`:vacio('Ningún expediente coincide.')};
 V.expedientes=()=>cab('Expedientes',`<button class="btn pri" data-a="nuevoExp">Nuevo expediente</button>`)+chips('exp',[['Abierto','Abiertos',S.expedientes.filter(e=>(e.estado||'Abierto')==='Abierto').length],['Cerrado','Cerrados',S.expedientes.filter(e=>e.estado==='Cerrado').length],['todos','Todos',S.expedientes.length]])+buscador('expedientes','Buscar por número, asunto, cliente, autos…')+`<div id="lst">${L.expedientes()}</div>`;
 V.expediente=id=>{const e=byId('expedientes',id);if(!e)return noEnc('#expedientes','Expedientes');
- const ev=S.eventos.filter(x=>x.expedienteId===id&&!x.hecho).sort(cmpEv);
+ const ev=(e.actuaciones||[]).filter(a=>a.pendiente).sort((x,y)=>String(x.fechaTarea||x.fecha).localeCompare(String(y.fechaTarea||y.fecha)));
  const act=[...(e.actuaciones||[])].sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
  const fa=S.facturas.filter(f=>f.expedienteId===id).sort(cmpFac);
  return volver('#expedientes','Expedientes')+cab('Expediente '+e.numero,`<button class="btn" data-a="editExp" data-id="${id}">Editar</button><button class="btn ghost dan" data-a="delExp" data-id="${id}">Borrar</button>`,`<a href="#cliente/${e.clienteId}">${esc(cliNom(e.clienteId))}</a>`)+
  ficha('expediente',e,['numero'])+
- sec('Tareas pendientes',`<button class="btn sm" data-a="nuevoEv" data-exp="${id}">Añadir</button>`,ev.length?`<div class="list">${ev.map(tareaRow).join('')}</div>`:vacio('Sin tareas pendientes.'))+
- sec('Actuaciones','',`<div class="panel"><div class="addact"><input type="date" id="actF" value="${hoy()}" aria-label="Fecha"><textarea id="actT" rows="2" placeholder="Escrito presentado, llamada, notificación…" aria-label="Actuación"></textarea><button class="btn pri" data-a="addAct" data-id="${id}">Añadir</button></div>${act.length?`<ol class="tl">${act.map(a=>`<li><time>${fFecha(a.fecha)}${a.hora?', '+esc(a.hora):''}</time><p>${esc(a.texto)}</p>${a.importe?`<p class="actimp ${a.importe<0?'neg':''}">${eur(a.importe)}</p>`:''}<button type="button" class="x" data-a="delAct" data-id="${id}" data-act="${a.id}" aria-label="Borrar actuación">×</button></li>`).join('')}</ol>`:''}</div>`)+
+ sec('Tareas pendientes',`<button class="btn sm" data-a="nuevaTarea" data-id="${id}">Añadir</button>`,ev.length?`<div class="list">${ev.map(a=>tareaActRow(e,a)).join('')}</div>`:vacio('Sin tareas pendientes.'))+
+ sec('Actuaciones','',`<div class="panel"><div class="addact"><input type="date" id="actF" value="${hoy()}" aria-label="Fecha"><textarea id="actT" rows="2" placeholder="Escrito presentado, llamada, notificación…" aria-label="Actuación"></textarea><button class="btn pri" data-a="addAct" data-id="${id}">Añadir</button></div>
+ <div class="actpend"><label><input type="checkbox" id="actP"> Tarea pendiente</label><input type="date" id="actFT" aria-label="Fecha de la tarea"></div>
+ ${act.length?`<ol class="tl">${act.map(a=>`<li${a.pendiente?' class="pte"':''}><div class="actx" data-a="editAct" data-id="${id}" data-act="${a.id}" title="Pulsa para modificar"><time>${fFecha(a.fecha)}${a.hora?', '+esc(a.hora):''}</time><p>${esc(a.texto)}</p>${a.importe?`<p class="actimp ${a.importe<0?'neg':''}">${eur(a.importe)}</p>`:''}<p class="estado-t">${a.pendiente?`Tarea pendiente: ${fFecha(a.fechaTarea||a.fecha)}`:'Terminada'}</p></div><button type="button" class="x" data-a="delAct" data-id="${id}" data-act="${a.id}" aria-label="Borrar actuación">×</button></li>`).join('')}</ol>`:''}</div>`)+
  sec('Previsión de honorarios pendientes','',prevHTML(e))+
  sec('Ingresos y gastos','',movHTML(e))+
  sec('Costas','',costasHTML(e))};
 
-L.agenda=()=>{if(!S.eventos.length)return vacio('La agenda está vacía. Pulsa «Nuevo» para apuntar un plazo, un señalamiento o una cita.');
- const q=norm(Q.agenda);const l=S.eventos.filter(e=>FL.ag==='todos'||(FL.ag==='pend'?!e.hecho:e.hecho)).filter(e=>{if(!q)return true;const x=expDe(e.expedienteId);return norm([e.titulo,e.tipo,e.lugar,x?.numero,x?.asunto,x&&cliNom(x.clienteId)].join(' ')).includes(q)}).sort(cmpEv);
+L.agenda=()=>{const TE=todosEventos();if(!TE.length)return vacio('La agenda está vacía. Pulsa «Nuevo» para apuntar un plazo, un señalamiento o una cita.');
+ const q=norm(Q.agenda);const l=TE.filter(e=>FL.ag==='todos'||(FL.ag==='pend'?!e.hecho:e.hecho)).filter(e=>{if(!q)return true;const x=expDe(e.expedienteId);return norm([e.titulo,e.tipo,e.lugar,x?.numero,x?.asunto,x&&cliNom(x.clienteId)].join(' ')).includes(q)}).sort(cmpEv);
  if(FL.ag==='hecho')l.reverse();
  if(!l.length)return vacio('No hay nada que mostrar con este filtro.');
  let out='',clave='',buf=[];const vuelca=()=>{if(buf.length)out+=`<h3 class="mes">${cap(new Date(clave+'-01T00:00').toLocaleDateString('es-ES',{month:'long',year:'numeric'}))}</h3><div class="list">${buf.join('')}</div>`;buf=[]};
@@ -581,7 +601,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='18';
+const VERSION='19';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -689,7 +709,7 @@ function importar(){const d=IMP.dest,m=Object.assign({},IMP.map),ent=ENTD[d];
    if(e){pon(e,o);act++}else{o.asunto=o.asunto||o.numero;o.numero=o.numero||sigExp();e={id:uid(),actuaciones:[],...o};S.expedientes.push(e);n++}
    if(r.__acts){e.actuaciones=e.actuaciones||[];const ya=new Set(e.actuaciones.map(a=>a.fecha+'|'+a.texto)),h0=hoy();
     for(const a of r.__acts){const key=a.fecha+'|'+a.texto;if(!ya.has(key)){const na={id:uid(),fecha:a.fecha,texto:a.texto};if(a.hora)na.hora=a.hora;if(a.importe)na.importe=a.importe;e.actuaciones.push(na);ya.add(key);nAct++}
-     if(a.fecha>=h0&&!S.eventos.some(x=>x.expedienteId===e.id&&x.fecha===a.fecha&&x.titulo===a.desc)){S.eventos.push({id:uid(),hecho:false,tipo:a.hora?'Señalamiento':'Tarea',titulo:a.desc,fecha:a.fecha,hora:a.hora||'',lugar:'',notas:'',expedienteId:e.id});nEv++}}movDesdeActs(e)}}
+     }movDesdeActs(e)}}
   else{o.fecha=toISO(o.fecha);if(!o.fecha||!(o.titulo||o.tipo)){sin++;continue}const x=o.expedienteId?buscaExp(o.expedienteId):null;o.expedienteId=x?x.id:'';
    const tp=TIPOS_EV.find(t=>norm(o.tipo).includes(norm(t).slice(0,5)));o.titulo=o.titulo||o.tipo;o.tipo=tp||(o.tipo?cap(o.tipo):'Plazo');const hm=String(o.hora).match(/(\d{1,2}):(\d{2})/);o.hora=hm?hm[1].padStart(2,'0')+':'+hm[2]:'';
    S.eventos.push({id:uid(),hecho:false,...o});n++}}
@@ -759,14 +779,24 @@ const ACT={
  delExp:id=>{const ne=S.eventos.filter(x=>x.expedienteId===id).length;if(!confirm(`¿Borrar este expediente?${ne?` Se borrarán también sus ${ne} plazos y citas.`:''} Las facturas se conservan.`))return;
   S.expedientes=S.expedientes.filter(e=>e.id!==id);S.eventos=S.eventos.filter(x=>x.expedienteId!==id);S.facturas.forEach(f=>{if(f.expedienteId===id)f.expedienteId=''});save();go('#expedientes');toast('Expediente borrado')},
  nuevoEv:(id,b)=>formModal('Nuevo plazo o cita',campos('evento'),{tipo:'Plazo',fecha:hoy(),expedienteId:b.dataset.exp||''},v=>{S.eventos.push({id:uid(),hecho:false,...v});toast('Apuntado en la agenda')}),
- editEv:id=>{const e=byId('eventos',id);formModal('Editar plazo o cita',campos('evento'),e,v=>{Object.assign(e,v)},`<button type="button" class="btn ghost dan izq" data-a="delEv" data-id="${id}">Borrar</button>`)},
+ editEv:id=>{if(String(id).startsWith('act|')){const [,ei,ai]=String(id).split('|');return ACT.editAct(ei,{dataset:{act:ai}})}const e=byId('eventos',id);formModal('Editar plazo o cita',campos('evento'),e,v=>{Object.assign(e,v)},`<button type="button" class="btn ghost dan izq" data-a="delEv" data-id="${id}">Borrar</button>`)},
  terminaTarea:id=>{const ev=byId('eventos',id),x=ev&&expDe(ev.expedienteId);if(!ev)return;
   if(x){const f=ev.fecha&&ev.fecha<hoy()?ev.fecha:hoy(),a={id:uid(),fecha:f,texto:(ev.tipo&&ev.tipo!=='Tarea'?ev.tipo+': ':'')+ev.titulo+(ev.lugar?' ('+ev.lugar+')':'')};if(ev.hora)a.hora=ev.hora;(x.actuaciones=x.actuaciones||[]).push(a)}
   S.eventos=S.eventos.filter(e=>e.id!==id);save();render();toast(x?'Tarea terminada: anotada en Actuaciones':'Tarea terminada')},
  borraTarea:id=>{const ev=byId('eventos',id);if(!ev||!confirm(`¿Borrar «${ev.titulo}» sin anotarla en Actuaciones? Úsalo solo si se apuntó por error.`))return;S.eventos=S.eventos.filter(e=>e.id!==id);save();render();toast('Tarea borrada')},
  delEv:id=>{if(!confirm('¿Borrar este plazo o cita?'))return;S.eventos=S.eventos.filter(e=>e.id!==id);dlg.close();save();render();toast('Borrado')},
- addAct:id=>{const t=$('#actT').value.trim();if(!t){$('#actT').focus();return}const e=byId('expedientes',id);(e.actuaciones=e.actuaciones||[]).push({id:uid(),fecha:$('#actF').value||hoy(),texto:t});save();render();toast('Actuación añadida')},
- delAct:(id,b)=>{if(!confirm('¿Borrar esta actuación?'))return;const e=byId('expedientes',id);e.actuaciones=(e.actuaciones||[]).filter(a=>a.id!==b.dataset.act);save();render()},
+ addAct:id=>{const t=$('#actT').value.trim();if(!t){$('#actT').focus();return}const e=byId('expedientes',id),p=$('#actP').checked,ft=$('#actFT').value;if(p&&!ft){$('#actFT').focus();toast('Pon la fecha de la tarea pendiente');return}
+  const a={id:uid(),fecha:$('#actF').value||hoy(),texto:t};if(p){a.pendiente=true;a.fechaTarea=ft}(e.actuaciones=e.actuaciones||[]).push(a);save();render();toast(p?'Actuación añadida como tarea pendiente':'Actuación añadida')},
+ nuevaTarea:id=>{const e=byId('expedientes',id);formModal('Nueva tarea pendiente',[{k:'texto',l:'Descripción',t:'area',req:1},{k:'fechaTarea',l:'Fecha de la tarea',t:'date',req:1,half:1},{k:'horaTarea',l:'Hora',t:'time',half:1}],{fechaTarea:hoy()},v=>{const a={id:uid(),fecha:hoy(),texto:v.texto,pendiente:true,fechaTarea:v.fechaTarea};if(v.horaTarea)a.horaTarea=v.horaTarea;(e.actuaciones=e.actuaciones||[]).push(a);toast('Tarea añadida')})},
+ terminaAct:(id,b)=>{const e=byId('expedientes',id),a=(e.actuaciones||[]).find(x=>x.id===b.dataset.act);if(!a)return;a.pendiente=false;save();render();toast('Tarea terminada. Sigue en Actuaciones')},
+ editAct:(id,b)=>{const e=byId('expedientes',id),a=(e.actuaciones||[]).find(x=>x.id===b.dataset.act);if(!a)return;
+  formModal('Modificar actuación',[{k:'fecha',l:'Fecha',t:'date',req:1,half:1},{k:'hora',l:'Hora',t:'time',half:1},{k:'texto',l:'Descripción',t:'area',req:1},{k:'importe',l:'Importe (€)',t:'number',half:1},{k:'pendiente',l:'Tarea pendiente',t:'select',o:['No','Sí'],half:1},{k:'fechaTarea',l:'Fecha de la tarea',t:'date',half:1},{k:'horaTarea',l:'Hora de la tarea',t:'time',half:1}],
+   {fecha:a.fecha,hora:a.hora||'',texto:a.texto,importe:num(a.importe)?num(a.importe).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}):'',pendiente:a.pendiente?'Sí':'No',fechaTarea:a.fechaTarea||'',horaTarea:a.horaTarea||''},
+   v=>{const p=v.pendiente==='Sí';if(p&&!v.fechaTarea){$('#err').textContent='Pon la fecha de la tarea pendiente.';return false}
+    a.fecha=v.fecha;a.texto=v.texto;if(v.hora)a.hora=v.hora;else delete a.hora;const im=parseImp(v.importe);if(im)a.importe=im;else delete a.importe;
+    a.pendiente=p;if(v.fechaTarea)a.fechaTarea=v.fechaTarea;if(v.horaTarea)a.horaTarea=v.horaTarea;else delete a.horaTarea;toast('Actuación modificada')},
+   `<button type="button" class="btn ghost dan izq" data-a="delAct" data-id="${id}" data-act="${a.id}">Borrar</button>`)},
+ delAct:(id,b)=>{if(!confirm('¿Borrar esta actuación?'))return;const e=byId('expedientes',id);e.actuaciones=(e.actuaciones||[]).filter(a=>a.id!==b.dataset.act);if(dlg.open)dlg.close();save();render()},
  nuevaFac:(id,b)=>{if(faltaCliente())return;facModal(null,b.dataset.cli,b.dataset.exp)},
  editFac:id=>facModal(byId('facturas',id)),
  delFac:id=>{if(confirm('¿Borrar esta factura? Si ya se la has enviado al cliente, lo correcto es hacer una factura rectificativa.')){S.facturas=S.facturas.filter(f=>f.id!==id);save();go('#facturas');toast('Factura borrada')}},
@@ -820,7 +850,8 @@ document.addEventListener('change',e=>{const t=e.target;if(!t.dataset||!t.datase
  if(!l.some(x=>norm(x)===norm(n))){l.push(n);l.sort((a,b)=>a.localeCompare(b,'es'))}ls[k]=l;save();
  const o=document.createElement('option');o.value=o.textContent=n;t.insertBefore(o,t.querySelector('option[value="__nuevo"]'));t.value=n});
 document.addEventListener('change',async e=>{const t=e.target,c=t.dataset&&t.dataset.c;if(!c)return;
- if(c==='hecho'){const ev=byId('eventos',t.dataset.id);if(!ev)return;ev.hecho=t.checked;save();render();toast(t.checked?'Marcado como hecho':'Marcado como pendiente')}
+ if(c==='hecho'&&String(t.dataset.id).startsWith('act|')){const {a}=actDe(t.dataset.id);if(a){a.pendiente=!t.checked;save();render();toast(t.checked?'Tarea terminada. Sigue en Actuaciones':'Marcada como pendiente')}}
+ else if(c==='hecho'){const ev=byId('eventos',t.dataset.id);if(!ev)return;ev.hecho=t.checked;save();render();toast(t.checked?'Marcado como hecho':'Marcado como pendiente')}
  else if(c==='impDest'){IMP.dest=t.value;IMP.map=adivinar(IMP.cols,IMP.dest);IMP.nuevos={};render()}
  else if(c==='impMap'){IMP.map[t.dataset.k]=t.value;render()}
  else if(c==='impNOn'||c==='impNNom'){const i=+t.dataset.i;const n=IMP.nuevos[i]||{on:!IMP.ocultas.includes(IMP.cols[i]),nombre:IMP.cols[i]};if(c==='impNOn')n.on=t.checked;else n.nombre=t.value.trim()||IMP.cols[i];IMP.nuevos[i]=n}
