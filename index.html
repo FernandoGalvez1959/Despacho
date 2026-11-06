@@ -227,6 +227,9 @@ table.mov tr.editable{cursor:pointer}
 .row.pv .pvi{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
 @media (max-width:640px){.list.prevl .row.pv{grid-template-columns:1fr auto;grid-template-areas:"x i" "a i" "c i";gap:2px 12px}
  .row.pv .pvx{grid-area:x}.row.pv .pva{grid-area:a}.row.pv .pvc{grid-area:c}.row.pv .pvi{grid-area:i;align-self:center}}
+.aviso-copia{display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap;padding:12px 14px;margin-bottom:16px;border-radius:12px;background:var(--warn-soft);color:var(--ink);font-size:15px}
+.row.copia{flex-wrap:wrap}
+@media (max-width:520px){.row.copia .txt{flex-basis:100%}}
 .ok-t{flex:none;width:40px;height:40px;border-radius:10px;border:1.5px solid var(--ok);background:transparent;color:var(--ok);font-size:20px;font-weight:600;cursor:pointer}
 .ok-t:hover{background:var(--ok);color:var(--surface)}
 .addcos{display:grid;grid-template-columns:1fr 120px 90px auto;gap:8px}
@@ -295,6 +298,25 @@ const IDB={p:null,abrir(){return this.p||(this.p=new Promise((ok,ko)=>{const r=i
  async op(modo,f){const db=await this.abrir();return new Promise((ok,ko)=>{const tx=db.transaction('kv',modo),st=tx.objectStore('kv');let res;const rq=f(st);if(rq)rq.onsuccess=()=>{res=rq.result};tx.oncomplete=()=>ok(res);tx.onerror=()=>ko(tx.error);tx.onabort=()=>ko(tx.error)})},
  get(k){return this.op('readonly',st=>st.get(k))},set(k,v){return this.op('readwrite',st=>st.put(v,k))},del(k){return this.op('readwrite',st=>st.delete(k))}};
 let tGuardar=null,avisoAlm=false;
+/* ---------- Copias automáticas ---------- */
+let COPIAS=[],cambiosCopia=0,ultCopiaMs=0,copiando=false;
+const MAX_COPIAS=10;
+async function cargarCopias(){try{COPIAS=(await IDB.get('copias'))||[]}catch(e){COPIAS=[]}ultCopiaMs=COPIAS.length?Date.parse(COPIAS[0].fecha):0}
+async function hacerCopia(motivo,forzar){if(!cargado||copiando)return;const nc=S.clientes.length,ne=S.expedientes.length;if(!nc&&!ne)return;
+ if(!forzar&&!cambiosCopia&&COPIAS.length)return;copiando=true;
+ try{const id=String(Date.now()),snap=JSON.parse(JSON.stringify(S));await IDB.set('copia:'+id,snap);
+  COPIAS.unshift({id,fecha:new Date().toISOString(),motivo,nc,ne});const sobran=COPIAS.splice(MAX_COPIAS);
+  await IDB.set('copias',COPIAS);for(const c of sobran)await IDB.del('copia:'+c.id).catch(()=>{});cambiosCopia=0;ultCopiaMs=Date.now()}catch(e){console.error(e)}
+ copiando=false;if(location.hash==='#ajustes'&&!dlg.open)render()}
+function copiaDiaria(){const ult=COPIAS[0];if(!ult||ult.fecha.slice(0,10)!==new Date().toISOString().slice(0,10))hacerCopia('Copia diaria',true)}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&cambiosCopia&&Date.now()-ultCopiaMs>30*60e3)hacerCopia('Al salir de la app')});
+const fCopia=iso=>{const d=new Date(iso);return d.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'})+' a las '+d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})};
+function descargarJSON(obj,nombre){const b=new Blob([JSON.stringify(obj,null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=nombre;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}
+const KEY_DESC='despacho_ultDescarga',KEY_POSP='despacho_posponer';
+function avisoCopiaHTML(){if(!S.clientes.length&&!S.expedientes.length)return '';const ult=+localStorage.getItem(KEY_DESC)||0,posp=+localStorage.getItem(KEY_POSP)||0,ahora=Date.now();
+ if(ahora-ult<7*864e5||ahora<posp)return '';const dias=ult?Math.floor((ahora-ult)/864e5):0;
+ return `<div class="aviso-copia"><span>${ult?`Hace ${dias} días que no descargas una copia de seguridad.`:'Todavía no has descargado ninguna copia de seguridad.'} Guárdala en tu Drive o en el PC.</span><span class="acc"><button class="btn sm pri" data-a="exportar">Descargar copia</button><button class="btn sm ghost" data-a="posponerCopia">Más tarde</button></span></div>`}
+
 function guardarYa(){clearTimeout(tGuardar);tGuardar=null;if(!cargado)return Promise.resolve();return IDB.set('S',S).catch(e=>{if(!avisoAlm){avisoAlm=true;toast('No se han podido guardar los datos en este dispositivo ('+((e&&e.name)||'error')+'). Siguen en la nube.')}})}
 function guardarLocal(){clearTimeout(tGuardar);tGuardar=setTimeout(guardarYa,400)}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){if(tGuardar)guardarYa();guardarPend()}});
@@ -312,7 +334,7 @@ const mismo=(a,b)=>{const ka=Object.keys(a);return ka.length===Object.keys(b).le
 function guardarPend(){if(cargado)IDB.set('pend',pend).catch(()=>{})}
 function desdeRemoto(v){v=v||{};const d={ajustes:v.ajustes};for(const c of COLS)d[c]=Object.values(v[c]||{});return normalizar(d)}
 let baseLocal=null;
-function save(){guardarLocal();if(refDatos&&primera&&baseLocal){const now=plano(S),h=huellas(now),upd={};for(const k in h)if(baseLocal[k]!==h[k])upd[k]=JSON.parse(now[k]);for(const k in baseLocal)if(!(k in h))upd[k]=null;baseLocal=h;if(Object.keys(upd).length){Object.assign(pend,upd);guardarPend()}return}
+function save(){guardarLocal();cambiosCopia++;if(refDatos&&primera&&baseLocal){const now=plano(S),h=huellas(now),upd={};for(const k in h)if(baseLocal[k]!==h[k])upd[k]=JSON.parse(now[k]);for(const k in baseLocal)if(!(k in h))upd[k]=null;baseLocal=h;if(Object.keys(upd).length){Object.assign(pend,upd);guardarPend()}return}
  if(!refDatos||primera)return;
  const now=plano(S),h=huellas(now),upd={};
  for(const k in h)if(syncPrev[k]!==h[k])upd[k]=JSON.parse(now[k]);
@@ -723,7 +745,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='32';
+const VERSION='33';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -812,7 +834,7 @@ function importHTML(){const cs=impCampos(IMP.dest),lib=IMP.rows.length?libresImp
  <div class="grid"><div class="fld half"><label for="impD">Qué vas a importar</label><select id="impD" data-c="impDest">${[['clientes','Clientes'],['expedientes','Expedientes'],['eventos','Plazos y citas']].map(([v,l])=>opt(v,l,v===IMP.dest)).join('')}</select></div>
  <div class="fld half"><span class="lbl">Archivo</span><label class="btn ancho">${IMP.nombre?esc(IMP.nombre):'Elegir archivo Excel o CSV'}<input type="file" accept=".xlsx,.xls,.csv,.ods,.txt" data-c="impFile" hidden></label></div></div>
  ${IMP.rows.length?`<p class="nota">${IMP.aviso?esc(IMP.aviso)+' ':''}${IMP.rows.length} filas encontradas. Revisa qué columna del archivo corresponde a cada dato.</p><div class="mapa">${cs.map(f=>`<div class="fld"><label for="m_${f.k}">${esc(IMPL[f.k]||f.l)}</label><select id="m_${f.k}" data-c="impMap" data-k="${f.k}">${opt('','No importar',!IMP.map[f.k])}${IMP.cols.map(c=>opt(c,c,IMP.map[f.k]===c)).join('')}</select></div>`).join('')}</div>${lib.length?`<h3 class="mes">Columnas que no corresponden a ningún dato</h3><p class="nota">Las marcadas se añadirán a la ficha como datos nuevos, con el nombre que escribas. Desmarca las que no quieras guardar.</p><div class="nuevos">${lib.map(x=>`<div class="nuevo"><input type="checkbox" data-c="impNOn" data-i="${x.i}"${x.on?' checked':''} aria-label="Añadir la columna ${esc(x.c)}"><div class="txt"><div class="s">Columna «${esc(x.c)}». Ejemplo: ${esc(ejemplo(x.c))}</div><input data-c="impNNom" data-i="${x.i}" value="${esc(x.nombre)}" aria-label="Nombre del dato nuevo"></div></div>`).join('')}</div>`:''}<div class="rapidos"><button class="btn pri" data-a="importar">Importar ${IMP.rows.length} filas</button><button class="btn ghost" data-a="impCancel">Cancelar</button></div>`:''}</div>`}
-function importar(){const d=IMP.dest,m=Object.assign({},IMP.map),ent=ENTD[d];
+function importar(){hacerCopia('Antes de importar',true);const d=IMP.dest,m=Object.assign({},IMP.map),ent=ENTD[d];
  const nuevos=libresImp().filter(x=>x.on);let creados=0;
  if(nuevos.length){const lista=cfgCampos(ent);for(const x of nuevos){const vals=IMP.rows.map(r=>r[x.c]).filter(Boolean);const t=vals.every(v=>toISO(v))?'date':vals.some(v=>v.length>80)?'area':'text';const k=nuevaClave();lista.push({k,l:(x.nombre||x.c).trim(),t,custom:1});m[k]=x.c;creados++}guardarCfg(ent,lista)}
  const cs=impCampos(d),val=(r,k)=>m[k]?String(r[m[k]]??'').trim():'';let n=0,rep=0,nuevosCli=0,sin=0;
@@ -858,6 +880,7 @@ V.ajustes=()=>{const d=S.ajustes.despacho,a=S.ajustes;
  sec('Listas desplegables','',listasHTML())+
  sec('Datos de las fichas','',camposHTML())+
  sec('Importar datos','',importHTML())+
+ sec('Copias automáticas','',`<div class="panel"><p class="nota">Se guarda una copia completa en este dispositivo cada día al abrir la app, al salir de ella si has hecho cambios, y antes de importar, recuperar o borrar. Se conservan las ${MAX_COPIAS} últimas.</p>${COPIAS.length?`<div class="list" style="margin-bottom:12px">${COPIAS.map(c=>`<div class="row copia"><div class="txt"><div class="t">${fCopia(c.fecha)}</div><div class="s">${esc(c.motivo)} · ${c.nc.toLocaleString('es-ES')} clientes, ${c.ne.toLocaleString('es-ES')} expedientes</div></div><button type="button" class="btn sm ghost" data-a="bajarCopia" data-c="${c.id}" title="Descargar en archivo">Descargar</button><button type="button" class="btn sm" data-a="recuperarCopia" data-c="${c.id}">Recuperar</button></div>`).join('')}</div>`:'<p>Todavía no hay copias automáticas.</p>'}<button class="btn" data-a="copiaAhora">Hacer una copia ahora</button></div>`)+
  sec('Duplicados','',`<div class="panel"><p>Busca expedientes con el mismo número, actuaciones repetidas y clientes creados dos veces, y los une sin perder tus cambios.</p><button class="btn" data-a="dups">Buscar y unir duplicados</button>${(()=>{const m=expMalos();return m.length?`<div class="aviso-malos"><p><strong>${m.length} expediente${m.length>1?'s':''} con número incorrecto.</strong> Se crearon por el fallo de importación de versiones anteriores y pueden mezclar actuaciones de varios expedientes:</p><ul>${m.slice(0,8).map(e=>`<li><a href="#expediente/${e.id}">${esc(e.numero)}</a>, ${esc(cliNom(e.clienteId))}, ${(e.actuaciones||[]).length} actuaciones</li>`).join('')}${m.length>8?`<li>y ${m.length-8} más</li>`:''}</ul><p>Bórralos y vuelve a importar el Excel de expedientes: se crearán bien, cada uno con su número.</p><button class="btn dan" data-a="borraMalos">Borrar estos expedientes</button></div>`:''})()}</div>`)+
  sec('Copia de seguridad','',`<div class="panel"><p>Descarga un archivo con todos tus datos o recupera una copia anterior.</p><div class="rapidos"><button class="btn" data-a="exportar">Descargar copia</button><label class="btn">Recuperar copia<input type="file" accept=".json,application/json" data-c="restaurar" hidden></label></div></div>`)+
  sec('Sincronización','',fbOk&&usuario?`<div class="panel"><p>Sesión iniciada como <strong>${esc(usuario.email)}</strong>. Tus datos son los mismos en todos los dispositivos donde entres con esta cuenta.</p><p class="nota" id="estadoRed">${textoRed()}</p><button class="btn" data-a="salir">Cerrar sesión</button></div>`:`<div class="panel"><p>No se ha podido cargar la sincronización, probablemente por falta de conexión. Los cambios se guardan en este dispositivo.</p></div>`)+
@@ -995,10 +1018,17 @@ const ACT={
  guardarAj:()=>{document.querySelectorAll('[data-d]').forEach(i=>S.ajustes.despacho[i.dataset.d]=i.value.trim());S.ajustes.serie=$('#a_serie').value.trim();S.ajustes.iva=num($('#a_iva').value);S.ajustes.irpf=num($('#a_irpf').value);save();toast('Datos guardados')},
  importar:()=>importar(),
  impCancel:()=>{Object.assign(IMP,{cols:[],rows:[],map:{},nombre:'',nuevos:{},ocultas:[],aviso:''});render()},
- exportar:()=>{const b=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='despacho-copia-'+hoy()+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)},
+ exportar:()=>{descargarJSON(S,'despacho-copia-'+hoy()+'.json');localStorage.setItem(KEY_DESC,String(Date.now()));localStorage.removeItem(KEY_POSP);render();toast('Copia descargada. Guárdala en tu Drive o en el PC')},
+ posponerCopia:()=>{localStorage.setItem(KEY_POSP,String(Date.now()+864e5));render()},
+ copiaAhora:()=>{hacerCopia('Copia manual',true).then(()=>toast('Copia guardada en este dispositivo'))},
+ bajarCopia:async(id,b)=>{const c=COPIAS.find(x=>x.id===b.dataset.c);const s=await IDB.get('copia:'+b.dataset.c);if(!s){toast('No se encuentra esa copia');return}descargarJSON(s,'despacho-copia-'+c.fecha.slice(0,16).replace(/[T:]/g,'-')+'.json')},
+ recuperarCopia:async(id,b)=>{const c=COPIAS.find(x=>x.id===b.dataset.c);if(!c)return;
+  if(!confirm(`¿Recuperar la copia del ${fCopia(c.fecha)}? (${c.nc} clientes, ${c.ne} expedientes)\n\nLos datos actuales se sustituirán${fbOk&&usuario?', también en la nube y en tus otros dispositivos':''}. Antes se guardará una copia del estado actual por si quieres volver atrás.`))return;
+  const s=await IDB.get('copia:'+c.id);if(!s){toast('No se encuentra esa copia');return}
+  await hacerCopia('Antes de recuperar una copia',true);S=normalizar(s);save();render();toast('Copia recuperada')},
  olvido:()=>{const em=$('#lg_e').value.trim(),er=$('#lg_err');if(!em){er.textContent='Escribe primero tu correo y vuelve a pulsar.';return}auth.sendPasswordResetEmail(em).then(()=>{er.textContent='';toast('Te hemos enviado un correo para cambiar la contraseña.')}).catch(x=>{er.textContent=errAuth(x.code)})},
  salir:()=>{if(!confirm('¿Cerrar sesión? Los datos se quitarán de este dispositivo, pero seguirán guardados en tu cuenta.'))return;if(refDatos){refDatos.off();refDatos=null}for(const k of [KEY,KEY_UID,KEY_CONF])localStorage.removeItem(k);S=normalizar(null);pend={};syncPrev={};clearTimeout(tGuardar);IDB.del('S').catch(()=>{});IDB.del('pend').catch(()=>{});auth.signOut()},
- borrarTodo:()=>{if(confirm(fbOk&&usuario?'¿Borrar todos los datos de tu cuenta, en todos tus dispositivos?':'¿Borrar todos los datos de este dispositivo?')&&confirm('No se puede deshacer. ¿Seguro?')){const aj=S.ajustes;S=normalizar({ajustes:aj});save();render();toast('Datos borrados')}}
+ borrarTodo:async()=>{await hacerCopia('Antes de borrar todo',true);if(confirm(fbOk&&usuario?'¿Borrar todos los datos de tu cuenta, en todos tus dispositivos?':'¿Borrar todos los datos de este dispositivo?')&&confirm('No se puede deshacer. ¿Seguro?')){const aj=S.ajustes;S=normalizar({ajustes:aj});save();render();toast('Datos borrados')}}
 };
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b)return;const f=ACT[b.dataset.a];if(f){e.preventDefault();f(b.dataset.id,b,e)}});
 document.addEventListener('submit',e=>{if(e.target.id!=='loginF')return;e.preventDefault();const em=$('#lg_e').value.trim(),pw=$('#lg_p').value,er=$('#lg_err'),b=e.target.querySelector('[type=submit]');er.textContent='';if(!em||!pw){er.textContent='Escribe el correo y la contraseña.';return}b.disabled=true;b.textContent='Entrando…';auth.signInWithEmailAndPassword(em,pw).catch(x=>{b.disabled=false;b.textContent='Entrar';er.textContent=errAuth(x.code)})});
@@ -1027,7 +1057,7 @@ function render(){if(!cargado){main.innerHTML='<div class="login"><p class="nota
  const h=location.hash.slice(1)||'clientes';const [v,id]=h.split('/');const secc={cliente:'clientes',expediente:'expedientes',factura:'facturas'}[v]||v;
  document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('on',a.dataset.v===secc));
  if(migrar())save();
- main.innerHTML=(V[v]||V.inicio)(id);
+ main.innerHTML=avisoCopiaHTML()+(V[v]||V.inicio)(id);
  if(h!==ultimo){window.scrollTo(0,0);ultimo=h}}
 window.addEventListener('hashchange',render);
 function iniciarFirebase(){if(window.firebase){try{firebase.initializeApp(CFG);auth=firebase.auth();auth.languageCode='es';fbOk=true;
@@ -1040,7 +1070,7 @@ async function arrancar(){let d=null;
  try{d=await IDB.get('S');pend=(await IDB.get('pend'))||{}}catch(e){console.error(e)}
  let deLS=null;try{deLS=JSON.parse(localStorage.getItem(KEY))}catch(e){}
  if(!d&&deLS)d=deLS;
- S=normalizar(d);cargado=true;baseLocal=huellas(plano(S));
+ S=normalizar(d);cargado=true;baseLocal=huellas(plano(S));await cargarCopias();{let n=0;const t=setInterval(()=>{n++;const listoNube=!fbOk||(usuario&&!primera);if(listoNube||n>30){clearInterval(t);if(listoNube)copiaDiaria()}},3000)}
  // libera el espacio de localStorage, que comparten todas tus apps de GitHub Pages
  if(deLS){try{await IDB.set('S',S);localStorage.removeItem(KEY)}catch(e){}}
  localStorage.removeItem(KEY_CONF);
