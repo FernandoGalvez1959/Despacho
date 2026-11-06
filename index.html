@@ -109,7 +109,9 @@ a.row:hover,.row .txt[data-a]:hover .t{color:var(--accent)}
 .addact{display:grid;grid-template-columns:170px 1fr auto;gap:8px;align-items:start}
 @media (max-width:600px){.addact{grid-template-columns:1fr}}
 .tl{list-style:none;margin:18px 0 0;padding:0 0 0 16px;border-left:2px solid var(--line)}
-.tl li{position:relative;padding:0 36px 14px 0}
+.tl li{position:relative;padding:0 72px 14px 0}
+.tl .x.mail{right:36px;font-size:18px;color:var(--accent)}
+.tl .x.mail:hover{color:var(--accent);background:var(--accent-soft)}
 .tl li::before{content:"";position:absolute;left:-22px;top:7px;width:10px;height:10px;border-radius:50%;background:var(--accent)}
 .tl time{font-size:13.5px;color:var(--muted)}
 .tl p{margin:1px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -202,6 +204,18 @@ table.mov tr.editable{cursor:pointer}
 .row.cabag div{font-weight:500!important;color:var(--muted)!important;font-size:12.5px!important}
 @media (max-width:640px){.list.agenda .row.ag{grid-template-columns:92px 1fr;grid-template-areas:"f x" "f c" "f t";gap:2px 12px}
  .row.ag .agf{grid-area:f}.row.ag .agx{grid-area:x}.row.ag .agc{grid-area:c}.row.ag .agt{grid-area:t}.row.cabag{display:none!important}}
+.addcont{display:grid;grid-template-columns:1.3fr 1.3fr 1fr auto;gap:8px}
+@media (max-width:640px){.addcont{grid-template-columns:1fr}}
+.dests{display:flex;flex-direction:column;gap:8px;margin:4px 0 14px}
+.dest{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.dest input{width:22px;height:22px;min-height:0;flex:none;margin-top:2px;accent-color:var(--accent)}
+.dest.sin{opacity:.6;cursor:default}.dest small{color:var(--muted)}
+.datos .cel-sit{background:var(--accent-soft);border-radius:8px;padding:6px 8px;margin:-4px -6px}
+.datos .cel-rev{background:var(--danger-soft);border-radius:8px;padding:6px 8px;margin:-4px -6px}
+.badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+.badges span{font-size:12.5px;padding:2px 8px;border-radius:6px;white-space:nowrap}
+.b-sit{background:var(--accent-soft);color:var(--accent)}
+.b-rev{background:var(--danger-soft);color:var(--danger)}
 .ok-t{flex:none;width:40px;height:40px;border-radius:10px;border:1.5px solid var(--ok);background:transparent;color:var(--ok);font-size:20px;font-weight:600;cursor:pointer}
 .ok-t:hover{background:var(--ok);color:var(--surface)}
 .addcos{display:grid;grid-template-columns:1fr 120px 90px auto;gap:8px}
@@ -381,7 +395,8 @@ const F={
   {k:'letradoContrario',l:'Letrado contrario',half:1},
   {k:'procurador',l:'Procurador',half:1},
   {k:'companero',l:'Letrado propio',t:'companero'},
-  {k:'procuradorPropio',l:'Procurador propio',t:'lista',lista:'procuradores'},
+  {k:'procuradorPropio',l:'Procurador propio',t:'lista',lista:'procuradores',half:1},
+  {k:'ultimaRevision',l:'Última revisión',t:'date',half:1},
   {k:'notas',l:'Notas',t:'area'}],
  evento:[
   {k:'tipo',l:'Tipo',t:'select',o:TIPOS_EV,half:1},
@@ -416,8 +431,8 @@ function guardarCfg(ent,lista){S.ajustes.campos=Object.assign({},S.ajustes.campo
 const nuevaClave=()=>'x_'+uid().replace(/[^a-z0-9]/gi,'').slice(0,10);
 
 /* ---------- Ventana de edición ---------- */
-function abrirDlg(cuerpo,alGuardar,alCambiar,izq=''){
- dlgForm.innerHTML=`<div class="dbody">${cuerpo}</div><div class="dfoot">${izq}<button type="button" class="btn ghost" data-a="cerrar">Cancelar</button><button type="submit" class="btn pri">Guardar</button></div>`;
+function abrirDlg(cuerpo,alGuardar,alCambiar,izq='',txt='Guardar'){
+ dlgForm.innerHTML=`<div class="dbody">${cuerpo}</div><div class="dfoot">${izq}<button type="button" class="btn ghost" data-a="cerrar">Cancelar</button><button type="submit" class="btn pri">${txt}</button></div>`;
  dlgForm.onsubmit=e=>{e.preventDefault();if(alGuardar()===false)return;dlg.close();save();render()};
  dlgForm.oninput=alCambiar||null;
  dlg.showModal();
@@ -437,7 +452,7 @@ const noEnc=(h,l)=>volver(h,l)+vacio('Este registro ya no existe.');
 const Q={},FL={exp:'Abierto',ag:'pend',fac:'pend',cli:'abiertos',ord:'letrado'};
 const buscador=(k,ph)=>`<input class="buscar" type="search" data-q="${k}" value="${esc(Q[k]||'')}" placeholder="${ph}" aria-label="${ph}">`;
 const chips=(k,ops)=>`<div class="chips">${ops.map(([v,l,n])=>`<button type="button" class="chip${FL[k]===v?' on':''}" data-a="filtro" data-k="${k}" data-v="${v}">${l}${n!==undefined?` <span class="cnt">${n.toLocaleString('es-ES')}</span>`:''}</button>`).join('')}</div>`;
-function datos(pares,todos){const p=todos?pares:pares.filter(x=>x[1]);if(!p.length)return '';return `<dl class="panel datos">${p.map(([l,v,html,ancho,raw])=>raw?`<div class="ancho">${v}</div>`:`<div${ancho?' class="ancho"':''}><dt>${esc(l)}</dt><dd>${html?v:esc(v)}</dd></div>`).join('')}</dl>`}
+function datos(pares,todos){const p=todos?pares:pares.filter(x=>x[1]);if(!p.length)return '';return `<dl class="panel datos">${p.map(([l,v,html,ancho,raw,cls])=>raw?`<div class="ancho">${v}</div>`:`<div class="${[ancho?'ancho':'',cls||''].join(' ').trim()}"><dt>${esc(l)}</dt><dd>${html?v:esc(v)}</dd></div>`).join('')}</dl>`}
 
 function telHTML(v){return esc(v).replace(/\+?\d[\d\s.-]{5,}\d/g,m=>`<a href="tel:${m.replace(/[\s.-]/g,'')}">${m}</a>`)}
 const ND='<span class="nd">—</span>';
@@ -457,6 +472,7 @@ function ficha(ent,o,saltar=[]){const cs=campos(ent).filter(f=>!saltar.includes(
   else if(f.t==='email')pares.push([f.l,`<a href="mailto:${esc(v)}">${esc(v)}</a>`,1,String(v).length>28]);
   else if(f.t==='date')pares.push([f.l,fFecha(v)]);
   else pares.push([f.l,String(v),0,f.t==='area'||f.k==='direccion'||nrm2(f.l)==='su referencia'||String(v).length>28])}
+ if(ent==='expediente')for(const pr of pares){const f=cs.find(x=>x.l===pr[0]);if(f&&f.k==='situacion')pr[5]='cel-sit';if(f&&f.k==='ultimaRevision')pr[5]='cel-rev'}
  return datos(pares,1)}
 const PART=['de','del','la','las','los','y','san','santa','da','das','do','dos','van','von','mac','mc'];
 const CLAVE=/^[A-ZÑ0-9]*[*0-9][A-ZÑ0-9*]*-/i;
@@ -569,7 +585,7 @@ const estadoN=e=>/cerr|archiv|baja|finaliz|termin|conclu/i.test(String(e.estado|
 const abierto=e=>estadoN(e)==='Abierto';
 function expDeCli(id){const ord=(a,b)=>String(a.apertura||'9999').localeCompare(String(b.apertura||'9999'))||String(a.numero).localeCompare(String(b.numero),'es',{numeric:true});const l=S.expedientes.filter(e=>e.clienteId===id);return [...l.filter(abierto).sort(ord),...l.filter(e=>!abierto(e)).sort(ord)]}
 const expRowCli=e=>{const j=limpiaJuzgado(e.juzgado),solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?(j||'Sin juzgado'):e.asunto)}</div><div class="s">${esc([e.situacion?'Situación: '+e.situacion:'Sin situación',solo?'':j].filter(Boolean).join(' · '))}</div></div>${abierto(e)?'':'<span class="tag">Cerrado</span>'}</a>`};
-function expRow(e){const solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?cliNom(e.clienteId):e.asunto)}</div><div class="s">${esc([solo?'':cliNom(e.clienteId),e.materia,limpiaJuzgado(e.juzgado)].filter(Boolean).join(', '))}</div></div>${e.companero?`<span class="abog">${esc(e.companero)}</span>`:''}${abierto(e)?'':'<span class="tag">Cerrado</span>'}</a>`}
+function expRow(e){const solo=!e.asunto||e.asunto===e.numero;return `<a class="row" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?cliNom(e.clienteId):e.asunto)}</div><div class="s">${esc([solo?'':cliNom(e.clienteId),e.materia,limpiaJuzgado(e.juzgado)].filter(Boolean).join(', '))}</div><div class="badges"><span class="b-sit">${e.situacion?esc(e.situacion):'Sin situación'}</span><span class="b-rev">${e.ultimaRevision?'Revisado '+fLarga(e.ultimaRevision):'Sin revisar'}</span></div></div>${e.companero?`<span class="abog">${esc(e.companero)}</span>`:''}${abierto(e)?'':'<span class="tag">Cerrado</span>'}</a>`}
 function facRow(f){const t=tot(f),x=expDe(f.expedienteId);return `<a class="row" href="#factura/${f.id}"><div class="num">${esc(f.numero)}</div><div class="txt"><div class="t">${esc(cliNom(f.clienteId))}</div><div class="s">${fFecha(f.fecha)}${x?', '+esc(x.asunto):''}</div></div><div class="imp"><b>${eur(t.total)}</b>${t.pend>0.004?`<small class="pend">Pendiente ${eur(t.pend)}</small>`:'<small class="ok">Cobrada</small>'}</div></a>`}
 function movDesdeActs(e){const acts=(e.actuaciones||[]).filter(a=>num(a.importe));if(!acts.length)return 0;
  e.movimientos=e.movimientos||[];const ya=new Set(e.movimientos.map(m=>m.k).filter(Boolean));let n=0,cargos=0,abonos=0;
@@ -588,6 +604,20 @@ function costasHTML(e){const l=e.costas||[];let t=0;
  const filas=l.map(c=>{const v=num(c.importe);t+=v;return `<tr class="editable" data-a="editCosta" data-id="${e.id}" data-costa="${c.id}" title="Pulsa para modificar"><td>${esc(c.texto)}</td><td class="r">${eur(v)}</td><td class="c ap ap-${esc(c.aprobadas||'')}">${esc(c.aprobadas||'')}</td><td class="c"><button type="button" class="x" data-a="delCosta" data-id="${e.id}" data-costa="${c.id}" aria-label="Borrar">×</button></td></tr>`}).join('');
  return `<div class="panel"><div class="addcos"><input id="csT" placeholder="Texto" aria-label="Texto"><input id="csI" inputmode="decimal" placeholder="Importe €" aria-label="Importe"><select id="csA" aria-label="Aprobadas">${opt('','S/P/O',1)}${Object.keys(APROB).map(k=>opt(k,k,0)).join('')}</select><button class="btn pri" data-a="addCosta" data-id="${e.id}">Añadir</button></div>
  ${l.length?`<div class="tabla"><table class="mov cos"><thead><tr><th>Texto</th><th class="r">Importe</th><th class="c">Aprobadas</th><th></th></tr></thead><tbody>${filas}</tbody><tfoot><tr><td>Total</td><td class="r">${eur(r2(t))}</td><td></td><td></td></tr></tfoot></table></div>`:'<p class="nota" style="margin:12px 0 0">Sin costas.</p>'}</div>`}
+let abrirURL=u=>{location.href=u};
+function mailActuacion(id,actId){const e=byId('expedientes',id),a=(e.actuaciones||[]).find(x=>x.id===actId);if(!e||!a)return;const c=byId('clientes',e.clienteId)||{};
+ const cl=c.nombre||'',asu=e.asunto&&e.asunto!==e.numero?e.asunto:'';
+ const dest=[];[c.email,c.email2].filter(Boolean).forEach((m,k)=>dest.push({q:'Cliente'+(k?' (correo 2)':''),n:cl,m}));
+ if(e.companero)dest.push({q:'Letrado propio',n:e.companero,m:contactoDe('letrado',e.companero).email});
+ if(e.procuradorPropio)dest.push({q:'Procurador propio',n:e.procuradorPropio,m:contactoDe('procurador',e.procuradorPropio).email});
+ const cuerpo=[`Expediente: ${e.numero}`,`Cliente: ${cl}`,asu?`Asunto: ${asu}`:'',e.juzgado?`Juzgado: ${limpiaJuzgado(e.juzgado)}`:'',e.autos?`Nº de procedimiento: ${e.autos}`:'','',`Actuación del ${fLarga(a.fecha)}${a.hora?' a las '+a.hora:''}:`,a.texto].filter((x,i)=>x!==''||i===5).join('\n');
+ abrirDlg(`<h2>Enviar actuación por correo</h2><span class="lbl">Destinatarios</span><div class="dests">${dest.length?dest.map((d,k)=>`<label class="dest${d.m?'':' sin'}"><input type="checkbox" data-mail="${esc(d.m||'')}"${d.m?(k===0?' checked':''):' disabled'}><span><strong>${esc(d.q)}</strong>: ${esc(d.n)}<br><small>${d.m?esc(d.m):'Sin correo. Añádelo en '+(d.q.startsWith('Cliente')?'la ficha del cliente':'Ajustes')}</small></span></label>`).join(''):'<p class="nota">Este expediente no tiene destinatarios con correo.</p>'}</div>
+  <div class="fld"><label for="m_otros">Otros correos (separados por comas)</label><input id="m_otros" type="text" inputmode="email"></div>
+  <div class="fld"><label for="m_asunto">Asunto</label><input id="m_asunto" value="${esc([cl,asu||e.numero].filter(Boolean).join(' – '))}"></div>
+  <div class="fld"><label for="m_cuerpo">Mensaje</label><textarea id="m_cuerpo" rows="9">${esc(cuerpo)}</textarea></div><p class="err" id="err"></p>`,()=>{
+  const to=[...dlgForm.querySelectorAll('[data-mail]')].filter(x=>x.checked).map(x=>x.dataset.mail).concat($('#m_otros').value.split(/[,;\s]+/).filter(Boolean));
+  if(!to.length){$('#err').textContent='Elige al menos un destinatario.';return false}
+  abrirURL('mailto:'+to.map(encodeURIComponent).join(',')+'?subject='+encodeURIComponent($('#m_asunto').value)+'&body='+encodeURIComponent($('#m_cuerpo').value));dlg.close();return false},null,'','Abrir en el correo')}
 function totalesHTML(f,t){return `<table class="tot"><tr><td>Base imponible</td><td class="r">${eur(t.base)}</td></tr><tr><td>IVA ${esc(f.iva)} %</td><td class="r">${eur(t.iva)}</td></tr>${num(f.irpf)?`<tr><td>Retención IRPF ${esc(f.irpf)} %</td><td class="r">−${eur(t.irpf)}</td></tr>`:''}${t.sup?`<tr><td>Suplidos</td><td class="r">${eur(t.sup)}</td></tr>`:''}<tr class="gt"><td>Total</td><td class="r">${eur(t.total)}</td></tr></table>`}
 
 /* ---------- Vistas ---------- */
@@ -630,12 +660,12 @@ V.expediente=id=>{const e=byId('expedientes',id);if(!e)return noEnc('#expediente
  const ev=(e.actuaciones||[]).filter(a=>a.pendiente).sort((x,y)=>String(x.fechaTarea||x.fecha).localeCompare(String(y.fechaTarea||y.fecha)));
  const act=[...(e.actuaciones||[])].sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
  const fa=S.facturas.filter(f=>f.expedienteId===id).sort(cmpFac);
- return volver('#expedientes','Expedientes')+cab('Expediente '+e.numero,`<button class="btn" data-a="editExp" data-id="${id}">Editar</button><button class="btn ghost dan" data-a="delExp" data-id="${id}">Borrar</button>`,`<a href="#cliente/${e.clienteId}">${esc(cliNom(e.clienteId))}</a>`)+
+ return volver('#expedientes','Expedientes')+cab('Expediente '+e.numero,`<button class="btn" data-a="revisado" data-id="${id}">Revisado hoy</button><button class="btn" data-a="editExp" data-id="${id}">Editar</button><button class="btn ghost dan" data-a="delExp" data-id="${id}">Borrar</button>`,`<a href="#cliente/${e.clienteId}">${esc(cliNom(e.clienteId))}</a>`)+
  ficha('expediente',e,['numero'])+
  sec('Tareas pendientes',`<button class="btn sm" data-a="nuevaTarea" data-id="${id}">Añadir</button>`,ev.length?`<div class="list">${ev.map(a=>tareaActRow(e,a)).join('')}</div>`:vacio('Sin tareas pendientes.'))+
  sec('Actuaciones','',`<div class="panel"><div class="addact"><input type="date" id="actF" value="${hoy()}" aria-label="Fecha"><textarea id="actT" rows="2" placeholder="Escrito presentado, llamada, notificación…" aria-label="Actuación"></textarea><button class="btn pri" data-a="addAct" data-id="${id}">Añadir</button></div>
  <div class="actpend"><label><input type="checkbox" id="actP"> Tarea pendiente</label><input type="date" id="actFT" aria-label="Fecha de la tarea"></div>
- ${act.length?`<ol class="tl">${act.map(a=>`<li${a.pendiente?' class="pte"':''}><div class="actx" data-a="editAct" data-id="${id}" data-act="${a.id}" title="Pulsa para modificar"><time>${fFecha(a.fecha)}${a.hora?', '+esc(a.hora):''}</time><p>${esc(a.texto)}</p>${a.importe?`<p class="actimp ${a.importe<0?'neg':''}">${eur(a.importe)}</p>`:''}<p class="estado-t">${a.pendiente?`Tarea pendiente: ${fFecha(a.fechaTarea||a.fecha)}`:'Terminada'}</p></div><button type="button" class="x" data-a="delAct" data-id="${id}" data-act="${a.id}" aria-label="Borrar actuación">×</button></li>`).join('')}</ol>`:''}</div>`)+
+ ${act.length?`<ol class="tl">${act.map(a=>`<li${a.pendiente?' class="pte"':''}><div class="actx" data-a="editAct" data-id="${id}" data-act="${a.id}" title="Pulsa para modificar"><time>${fFecha(a.fecha)}${a.hora?', '+esc(a.hora):''}</time><p>${esc(a.texto)}</p>${a.importe?`<p class="actimp ${a.importe<0?'neg':''}">${eur(a.importe)}</p>`:''}<p class="estado-t">${a.pendiente?`Tarea pendiente: ${fFecha(a.fechaTarea||a.fecha)}`:'Terminada'}</p></div><button type="button" class="x mail" data-a="mailAct" data-id="${id}" data-act="${a.id}" aria-label="Enviar por correo" title="Enviar por correo">✉</button><button type="button" class="x" data-a="delAct" data-id="${id}" data-act="${a.id}" aria-label="Borrar actuación">×</button></li>`).join('')}</ol>`:''}</div>`)+
  sec('Previsión de honorarios pendientes','',prevHTML(e))+
  sec('Ingresos y gastos','',movHTML(e))+
  sec('Costas','',costasHTML(e))};
@@ -674,7 +704,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='26';
+const VERSION='28';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -817,9 +847,13 @@ V.ajustes=()=>{const d=S.ajustes.despacho,a=S.ajustes;
 
 const LISTAS={asuntos:'Asuntos',situaciones:'Situaciones',procuradores:'Procuradores'};let LE='asuntos';
 function listasHTML(){const l=(S.ajustes.listas||{})[LE]||[];
- return `<div class="panel"><p class="nota">Elementos de los desplegables del expediente. También puedes añadirlos desde el propio desplegable con «➕ Añadir nuevo…».</p><div class="chips">${Object.entries(LISTAS).map(([k,n])=>`<button type="button" class="chip${LE===k?' on':''}" data-a="le" data-v="${k}">${n} <span class="cnt">${((S.ajustes.listas||{})[k]||[]).length}</span></button>`).join('')}</div>${l.length?`<div class="list" style="margin-bottom:12px">${l.map((n,i)=>`<div class="row"><div class="txt"><div class="t">${esc(n)}</div></div><button type="button" class="btn sm ghost dan" data-a="quitaLista" data-i="${i}">Quitar</button></div>`).join('')}</div>`:''}<div class="addact" style="grid-template-columns:1fr auto"><input id="nuevoLista" placeholder="Nuevo elemento" aria-label="Nuevo elemento"><button class="btn pri" data-a="addLista">Añadir</button></div></div>`}
+ return `<div class="panel"><p class="nota">Elementos de los desplegables del expediente. También puedes añadirlos desde el propio desplegable con «➕ Añadir nuevo…».</p><div class="chips">${Object.entries(LISTAS).map(([k,n])=>`<button type="button" class="chip${LE===k?' on':''}" data-a="le" data-v="${k}">${n} <span class="cnt">${((S.ajustes.listas||{})[k]||[]).length}</span></button>`).join('')}</div>${l.length?`<div class="list" style="margin-bottom:12px">${l.map((n,i)=>LE==='procuradores'?filaContacto('procurador',n,i,'quitaLista'):`<div class="row"><div class="txt"><div class="t">${esc(n)}</div></div><button type="button" class="btn sm ghost dan" data-a="quitaLista" data-i="${i}">Quitar</button></div>`).join('')}</div>`:''}${LE==='procuradores'?formContacto('nuevoLista'):`<div class="addact" style="grid-template-columns:1fr auto"><input id="nuevoLista" placeholder="Nuevo elemento" aria-label="Nuevo elemento"><button class="btn pri" data-a="addLista">Añadir</button></div>`}</div>`}
+const contactoDe=(tipo,n)=>(S.ajustes.contactos||[]).find(c=>c.tipo===tipo&&c.nombre===n)||{};
+function ponContacto(tipo,n,email,tel){const l=(S.ajustes.contactos||[]).filter(c=>!(c.tipo===tipo&&c.nombre===n));if(email||tel)l.push({tipo,nombre:n,email:email||'',tel:tel||''});S.ajustes.contactos=l}
+const filaContacto=(tipo,n,i,quita)=>{const c=contactoDe(tipo,n);return `<div class="row"><div class="txt"><div class="t">${esc(n)}</div><div class="s">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'Sin correo'}${c.tel?'<br>'+telHTML(c.tel):''}</div></div><button type="button" class="btn sm" data-a="editContacto" data-tipo="${tipo}" data-i="${i}">Editar</button><button type="button" class="btn sm ghost dan" data-a="${quita}" data-i="${i}">Quitar</button></div>`};
+const formContacto=(pre)=>`<div class="addcont"><input id="${pre}" placeholder="Nombre y apellidos" aria-label="Nombre"><input id="${pre}Mail" type="email" placeholder="Correo electrónico" aria-label="Correo"><input id="${pre}Tel" type="tel" placeholder="Teléfono" aria-label="Teléfono"><button class="btn pri" data-a="${pre==='nuevoComp'?'addComp':'addLista'}">Añadir</button></div>`;
 function companerosHTML(){const l=S.ajustes.companeros||[];
- return `<div class="panel"><p class="nota">Letrados que tramitan los asuntos. Asigna uno a cada cliente en su ficha («Editar» › Letrado) y se aplicará a todos sus expedientes abiertos. También puedes cambiarlo en un expediente concreto.</p>${l.length?`<div class="list" style="margin-bottom:12px">${l.map((n,i)=>`<div class="row"><div class="txt"><div class="t">${esc(n)}</div></div><button type="button" class="btn sm ghost dan" data-a="quitaComp" data-i="${i}">Quitar</button></div>`).join('')}</div>`:''}<div class="addact" style="grid-template-columns:1fr auto"><input id="nuevoComp" placeholder="Nombre y apellidos" aria-label="Nombre del compañero"><button class="btn pri" data-a="addComp">Añadir</button></div></div>`}
+ return `<div class="panel"><p class="nota">Letrados que tramitan los asuntos. Asigna uno a cada cliente en su ficha («Editar» › Letrado) y se aplicará a todos sus expedientes abiertos. También puedes cambiarlo en un expediente concreto.</p>${l.length?`<div class="list" style="margin-bottom:12px">${l.map((n,i)=>filaContacto('letrado',n,i,'quitaComp')).join('')}</div>`:''}${formContacto('nuevoComp')}</div>`}
 let CE='cliente';
 function camposHTML(){const l=cfgCampos(CE);return `<div class="panel"><p class="nota">Elige qué datos tiene cada ficha, cómo se llaman y en qué orden aparecen.</p><div class="chips">${Object.entries(ENT).map(([k,n])=>`<button type="button" class="chip${CE===k?' on':''}" data-a="ce" data-v="${k}">${n}</button>`).join('')}</div>
  <div class="list">${l.map((f,i)=>`<div class="row campo${f.oculto?' is-oculto':''}"><div class="txt"><div class="t">${esc(f.l)}${f.oculto?' <span class="tag">Oculto</span>':''}</div><div class="s">${esc(nomTipo(f))}${f.custom?', añadido por ti':''}${f.req?', obligatorio':''}</div></div><button type="button" class="btn sm ghost" data-a="subeCampo" data-i="${i}" aria-label="Subir ${esc(f.l)}"${i?'':' disabled'}>↑</button><button type="button" class="btn sm ghost" data-a="bajaCampo" data-i="${i}" aria-label="Bajar ${esc(f.l)}"${i<l.length-1?'':' disabled'}>↓</button><button type="button" class="btn sm" data-a="editCampo" data-i="${i}">Editar</button></div>`).join('')}</div>
@@ -899,7 +933,7 @@ const ACT={
  dups:()=>{const r=unirDuplicados();if(r.ne||r.na||r.nc){save();render()}toast(textoDup(r))},
  verEC:id=>{VER_EC[id]=!VER_EC[id];render()},
  le:(id,b)=>{LE=b.dataset.v;render()},
- addLista:()=>{const v=$('#nuevoLista').value.trim();if(!v){$('#nuevoLista').focus();return}const ls=S.ajustes.listas=Object.assign({},S.ajustes.listas),l=[...(ls[LE]||[])];if(l.some(x=>norm(x)===norm(v))){toast('Ya está en la lista');return}l.push(v);l.sort((a,b)=>a.localeCompare(b,'es'));ls[LE]=l;save();render()},
+ addLista:()=>{const v=$('#nuevoLista').value.trim();if(!v){$('#nuevoLista').focus();return}const ls=S.ajustes.listas=Object.assign({},S.ajustes.listas),l=[...(ls[LE]||[])];if(l.some(x=>norm(x)===norm(v))){toast('Ya está en la lista');return}l.push(v);l.sort((a,b)=>a.localeCompare(b,'es'));ls[LE]=l;if(LE==='procuradores')ponContacto('procurador',v,($('#nuevoListaMail')||{}).value?.trim(),($('#nuevoListaTel')||{}).value?.trim());save();render()},
  quitaLista:(id,b)=>{const ls=S.ajustes.listas=Object.assign({},S.ajustes.listas),l=[...(ls[LE]||[])],n=l[+b.dataset.i];if(!confirm(`¿Quitar «${n}» de la lista? Los expedientes que ya lo tengan lo conservan.`))return;l.splice(+b.dataset.i,1);ls[LE]=l;save();render()},
  guardaPrev:id=>{const e=byId('expedientes',id);e.prevHonorarios=parseImp($('#prevH').value);save();render();toast('Previsión guardada')},
  addMov:id=>{const e=byId('expedientes',id),c=$('#mvC').value.trim(),i=parseImp($('#mvI').value),g=parseImp($('#mvG').value);if(!c){$('#mvC').focus();toast('Escribe el concepto');return}if(!i&&!g){$('#mvI').focus();toast('Escribe el ingreso o el gasto');return}
@@ -915,7 +949,17 @@ const ACT={
   formModal('Modificar movimiento',[{k:'fecha',l:'Fecha',t:'date',req:1,half:1},{k:'concepto',l:'Concepto',req:1},{k:'ingreso',l:'Ingreso (€)',t:'number',half:1},{k:'gasto',l:'Gasto (€)',t:'number',half:1}],{fecha:m.fecha,concepto:m.concepto,ingreso:f2(m.ingreso),gasto:f2(m.gasto)},
    v=>{const i=parseImp(v.ingreso),g=parseImp(v.gasto);if(!i&&!g){$('#err').textContent='Escribe el ingreso o el gasto.';return false}m.fecha=v.fecha;m.concepto=v.concepto;m.ingreso=i;m.gasto=g;toast('Movimiento modificado')},
    `<button type="button" class="btn ghost dan izq" data-a="delMov" data-id="${id}" data-mov="${m.id}">Borrar</button>`)},
- addComp:()=>{const v=$('#nuevoComp').value.trim();if(!v){$('#nuevoComp').focus();return}const l=[...(S.ajustes.companeros||[])];if(l.some(x=>norm(x)===norm(v))){toast('Ese nombre ya está en la lista');return}l.push(v);l.sort((a,b)=>a.localeCompare(b,'es'));S.ajustes.companeros=l;save();render();toast('Compañero añadido')},
+ editContacto:(id,b)=>{const tipo=b.dataset.tipo,i=+b.dataset.i,lista=tipo==='letrado'?[...(S.ajustes.companeros||[])]:[...((S.ajustes.listas||{}).procuradores||[])],n=lista[i],c=contactoDe(tipo,n);
+  formModal(tipo==='letrado'?'Letrado':'Procurador',[{k:'nombre',l:'Nombre y apellidos',req:1},{k:'email',l:'Correo electrónico',t:'email'},{k:'tel',l:'Teléfono',t:'tel'}],{nombre:n,email:c.email||'',tel:c.tel||''},v=>{
+   if(v.nombre!==n){if(lista.some((x,j)=>j!==i&&norm(x)===norm(v.nombre))){$('#err').textContent='Ese nombre ya está en la lista.';return false}
+    lista[i]=v.nombre;lista.sort((a,b)=>a.localeCompare(b,'es'));
+    if(tipo==='letrado'){S.ajustes.companeros=lista;S.clientes.forEach(x=>{if(x.letrado===n)x.letrado=v.nombre});S.expedientes.forEach(x=>{if(x.companero===n)x.companero=v.nombre})}
+    else{S.ajustes.listas=Object.assign({},S.ajustes.listas,{procuradores:lista});S.expedientes.forEach(x=>{if(x.procuradorPropio===n)x.procuradorPropio=v.nombre})}
+    ponContacto(tipo,n,'','')}
+   ponContacto(tipo,v.nombre,v.email,v.tel);toast('Datos guardados')})},
+ revisado:id=>{const e=byId('expedientes',id);e.ultimaRevision=hoy();save();render();toast('Última revisión: hoy')},
+ mailAct:(id,b)=>mailActuacion(id,b.dataset.act),
+ addComp:()=>{const v=$('#nuevoComp').value.trim();if(!v){$('#nuevoComp').focus();return}const l=[...(S.ajustes.companeros||[])];if(l.some(x=>norm(x)===norm(v))){toast('Ese nombre ya está en la lista');return}l.push(v);l.sort((a,b)=>a.localeCompare(b,'es'));S.ajustes.companeros=l;ponContacto('letrado',v,($('#nuevoCompMail')||{}).value?.trim(),($('#nuevoCompTel')||{}).value?.trim());save();render();toast('Letrado añadido')},
  quitaComp:(id,b)=>{const l=[...(S.ajustes.companeros||[])],n=l[+b.dataset.i];const u=S.expedientes.filter(e=>e.companero===n).length,uc=S.clientes.filter(c=>c.letrado===n).length;if(!confirm(`¿Quitar a ${n} de la lista?${u||uc?` Tiene ${uc} clientes y ${u} expedientes asignados, que quedarán sin asignar.`:''}`))return;l.splice(+b.dataset.i,1);S.ajustes.companeros=l;S.expedientes.forEach(e=>{if(e.companero===n)e.companero=''});S.clientes.forEach(c=>{if(c.letrado===n)c.letrado=''});save();render()},
  subeCampo:(id,b)=>moverCampo(+b.dataset.i,-1),
  bajaCampo:(id,b)=>moverCampo(+b.dataset.i,1),
