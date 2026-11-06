@@ -187,6 +187,19 @@ table.mov tr.editable{cursor:pointer}
 .tl .estado-t{font-size:13px;color:var(--muted)}
 .tl li.pte .estado-t{color:var(--warn);font-weight:600}
 .tl li.pte::before{background:var(--warn)}
+.tri{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 16px}
+.list.agenda .row.ag{display:grid;grid-template-columns:92px 140px minmax(140px,1fr) 2fr;gap:12px;align-items:baseline;padding:11px 16px}
+.row.ag .agf{font-variant-numeric:tabular-nums;font-weight:600}
+.row.ag .agf small{display:block;font-weight:400;color:var(--muted);font-size:13px}
+.row.ag .agx{font-variant-numeric:tabular-nums;color:var(--muted);font-size:14.5px}
+.row.ag .agc{font-size:14.5px;overflow-wrap:anywhere}
+.row.ag .agt{font-weight:500;overflow-wrap:anywhere}
+.row.ag.pasada .agf{color:var(--danger)}
+.row.ag.hoy .agf{color:var(--accent)}
+.row.cabag{background:var(--bg)}
+.row.cabag div{font-weight:500!important;color:var(--muted)!important;font-size:12.5px!important}
+@media (max-width:640px){.list.agenda .row.ag{grid-template-columns:72px 1fr;grid-template-areas:"f x" "f c" "f t";gap:2px 12px}
+ .row.ag .agf{grid-area:f}.row.ag .agx{grid-area:x}.row.ag .agc{grid-area:c}.row.ag .agt{grid-area:t}.row.cabag{display:none!important}}
 .ok-t{flex:none;width:40px;height:40px;border-radius:10px;border:1.5px solid var(--ok);background:transparent;color:var(--ok);font-size:20px;font-weight:600;cursor:pointer}
 .ok-t:hover{background:var(--ok);color:var(--surface)}
 .addcos{display:grid;grid-template-columns:1fr 120px 90px auto;gap:8px}
@@ -418,7 +431,7 @@ const noEnc=(h,l)=>volver(h,l)+vacio('Este registro ya no existe.');
 const Q={},FL={exp:'Abierto',ag:'pend',fac:'pend',cli:'abiertos',ord:'letrado'};
 const buscador=(k,ph)=>`<input class="buscar" type="search" data-q="${k}" value="${esc(Q[k]||'')}" placeholder="${ph}" aria-label="${ph}">`;
 const chips=(k,ops)=>`<div class="chips">${ops.map(([v,l,n])=>`<button type="button" class="chip${FL[k]===v?' on':''}" data-a="filtro" data-k="${k}" data-v="${v}">${l}${n!==undefined?` <span class="cnt">${n.toLocaleString('es-ES')}</span>`:''}</button>`).join('')}</div>`;
-function datos(pares,todos){const p=todos?pares:pares.filter(x=>x[1]);if(!p.length)return '';return `<dl class="panel datos">${p.map(([l,v,html,ancho])=>`<div${ancho?' class="ancho"':''}><dt>${esc(l)}</dt><dd>${html?v:esc(v)}</dd></div>`).join('')}</dl>`}
+function datos(pares,todos){const p=todos?pares:pares.filter(x=>x[1]);if(!p.length)return '';return `<dl class="panel datos">${p.map(([l,v,html,ancho,raw])=>raw?`<div class="ancho">${v}</div>`:`<div${ancho?' class="ancho"':''}><dt>${esc(l)}</dt><dd>${html?v:esc(v)}</dd></div>`).join('')}</dl>`}
 
 function telHTML(v){return esc(v).replace(/\+?\d[\d\s.-]{5,}\d/g,m=>`<a href="tel:${m.replace(/[\s.-]/g,'')}">${m}</a>`)}
 const ND='<span class="nd">—</span>';
@@ -429,6 +442,9 @@ function ficha(ent,o,saltar=[]){const cs=campos(ent).filter(f=>!saltar.includes(
  for(const f of cs){const g=/^telefono\d?$/.test(f.k)?'tel':/^email\d?$/.test(f.k)?'mail':'';
   if(g){if(hechos.has(g))continue;hechos.add(g);const vs=cs.filter(x=>(g==='tel'?/^telefono\d?$/:/^email\d?$/).test(x.k)).map(x=>o[x.k]).filter(Boolean).flatMap(v=>String(v).split(/\s*;\s*/)).filter(Boolean);
    pares.push([g==='tel'?'Teléfonos':'Correos',vs.length?vs.map(v=>`<div>${g==='tel'?telHTML(v):`<a href="mailto:${esc(v)}">${esc(v)}</a>`}</div>`).join(''):ND,1,vs.some(v=>String(v).length>24)]);continue}
+  const TRI=['su referencia','cuantia inicial','cuantia final'];
+  if(ent==='expediente'&&f.custom&&TRI.includes(nrm2(f.l))){if(hechos.has('tri'))continue;hechos.add('tri');const tr=TRI.map(n=>cs.find(x=>x.custom&&nrm2(x.l)===n)).filter(Boolean);
+   pares.push(['',`<div class="tri">${tr.map(x=>`<div><dt>${esc(x.l)}</dt><dd>${o[x.k]?esc(o[x.k]):ND}</dd></div>`).join('')}</div>`,1,1,1]);continue}
   if(ent==='cliente'&&f.custom&&/expedient|asunto/.test(nrm2(f.l))){const ab=S.expedientes.filter(e=>e.clienteId===o.id&&abierto(e));pares.push(['Expedientes abiertos',String(ab.length)]);continue}
   const v=o[f.k];if(v===undefined||v===null||v===''){pares.push([f.l,ND,1,f.t==='area'||nrm2(f.l)==='su referencia']);continue}
   if(f.t==='tel')pares.push([f.l,telHTML(v),1,String(v).length>28]);
@@ -524,10 +540,10 @@ V.inicio=()=>{const h=hoy();const pend=todosEventos().filter(e=>!e.hecho).sort(c
  const fp=S.facturas.map(tot).filter(t=>t.pend>0.004);const totalP=fp.reduce((a,t)=>a+t.pend,0);
  const nada=!S.clientes.length&&!S.expedientes.length;
  return `<div class="top"><div class="tit"><p class="fecha">${cap(fFecha(h,1))}</p><h1>${esc(S.ajustes.despacho.nombre||'Despacho')}</h1></div><div class="acc"><a class="btn ghost solo-movil" href="#ajustes" aria-label="Ajustes">${ICO_AJ}</a></div></div>
- <div class="rapidos"><button class="btn" data-a="nuevoEv">Nuevo plazo o cita</button><button class="btn" data-a="nuevoExp">Nuevo expediente</button><button class="btn" data-a="nuevoCli">Nuevo cliente</button><button class="btn" data-a="nuevaFac">Nueva factura</button></div>
+ <div class="rapidos"><button class="btn" data-a="nuevoEv">Nueva tarea</button><button class="btn" data-a="nuevoExp">Nuevo expediente</button><button class="btn" data-a="nuevoCli">Nuevo cliente</button><button class="btn" data-a="nuevaFac">Nueva factura</button></div>
  ${nada?`<div class="panel aviso"><h2>Para empezar</h2><p>Añade tu primer cliente o trae los datos de tu programa actual desde <a href="#ajustes">Ajustes, Importar datos</a>.</p></div>`:''}
- ${venc.length?`<h2 class="sec peligro">Vencidos sin marcar como hechos</h2><div class="list">${venc.map(evRow).join('')}</div>`:''}
- <h2 class="sec">Próximas dos semanas</h2>${prox.length?`<div class="list">${prox.map(evRow).join('')}</div>`:vacio('No hay plazos, señalamientos ni citas en los próximos 14 días.')}
+ ${venc.length?`<h2 class="sec peligro">Tareas con fecha pasada</h2><div class="list agenda">${venc.map(agendaRow).join('')}</div>`:''}
+ <h2 class="sec">Próximas dos semanas</h2>${prox.length?`<div class="list agenda">${prox.map(agendaRow).join('')}</div>`:vacio('No hay plazos, señalamientos ni citas en los próximos 14 días.')}
  <h2 class="sec">Pendiente de cobro</h2><a class="panel cobro" href="#facturas"><span class="importe">${eur(totalP)}</span><span class="nota">${fp.length===1?'1 factura sin cobrar del todo':fp.length+' facturas sin cobrar del todo'}</span></a>`};
 
 function estadoCli(){const m={};for(const e of S.expedientes){const x=m[e.clienteId]||(m[e.clienteId]={ab:0,ce:0});if((e.estado||'Abierto')==='Abierto')x.ab++;else x.ce++}return m}
@@ -567,13 +583,13 @@ V.expediente=id=>{const e=byId('expedientes',id);if(!e)return noEnc('#expediente
  sec('Ingresos y gastos','',movHTML(e))+
  sec('Costas','',costasHTML(e))};
 
-L.agenda=()=>{const TE=todosEventos();if(!TE.length)return vacio('La agenda está vacía. Pulsa «Nuevo» para apuntar un plazo, un señalamiento o una cita.');
- const q=norm(Q.agenda);const l=TE.filter(e=>FL.ag==='todos'||(FL.ag==='pend'?!e.hecho:e.hecho)).filter(e=>{if(!q)return true;const x=expDe(e.expedienteId);return norm([e.titulo,e.tipo,e.lugar,x?.numero,x?.asunto,x&&cliNom(x.clienteId)].join(' ')).includes(q)}).sort(cmpEv);
- if(FL.ag==='hecho')l.reverse();
- if(!l.length)return vacio('No hay nada que mostrar con este filtro.');
- let out='',clave='',buf=[];const vuelca=()=>{if(buf.length)out+=`<h3 class="mes">${cap(new Date(clave+'-01T00:00').toLocaleDateString('es-ES',{month:'long',year:'numeric'}))}</h3><div class="list">${buf.join('')}</div>`;buf=[]};
- for(const e of l){const k=String(e.fecha).slice(0,7);if(k!==clave){vuelca();clave=k}buf.push(evRow(e))}vuelca();return out};
-V.agenda=()=>cab('Agenda',`<button class="btn pri" data-a="nuevoEv">Nuevo</button>`)+chips('ag',[['pend','Pendientes'],['hecho','Hechos'],['todos','Todos']])+buscador('agenda','Buscar en la agenda…')+`<div id="lst">${L.agenda()}</div>`;
+function agendaRow(ev){const x=expDe(ev.expedienteId),d=dias(ev.fecha);return `<a class="row ag${d<0?' pasada':d===0?' hoy':''}" href="#expediente/${ev.expedienteId}"><div class="agf">${fCorta(ev.fecha)}${ev.hora?`<small>${esc(ev.hora)}</small>`:''}</div><div class="agx">${x?esc(x.numero):''}</div><div class="agc">${x?esc(cliNom(x.clienteId)):''}</div><div class="agt">${esc(ev.titulo)}</div></a>`}
+const cercania=(a,b)=>{const da=dias(a.fecha),db=dias(b.fecha);return Math.abs(da)-Math.abs(db)||db-da||String(a.hora||'99').localeCompare(String(b.hora||'99'))};
+L.agenda=()=>{const TE=todosEventos().filter(e=>!e.hecho);if(!TE.length)return vacio('No hay tareas pendientes. Se añaden desde las actuaciones de cada expediente.');
+ const q=norm(Q.agenda);const l=TE.filter(e=>{if(!q)return true;const x=expDe(e.expedienteId);return norm([e.titulo,x?.numero,x?.asunto,x&&cliNom(x.clienteId)].join(' ')).includes(q)}).sort(cercania);
+ if(!l.length)return vacio('Ninguna tarea coincide con la búsqueda.');
+ return `<div class="list agenda"><div class="row ag cabag"><div class="agf">Fecha</div><div class="agx">Expediente</div><div class="agc">Cliente</div><div class="agt">Tarea pendiente</div></div>${l.map(agendaRow).join('')}</div>`};
+V.agenda=()=>cab('Agenda',`<button class="btn pri" data-a="nuevoEv">Nueva tarea</button>`)+`<p class="nota" style="margin-top:-8px">Ordenadas de la más cercana a hoy a la más lejana. Las pasadas se ven en rojo y siguen aquí hasta que las des por terminadas en su expediente.</p>`+buscador('agenda','Buscar por expediente, cliente o tarea…')+`<div id="lst">${L.agenda()}</div>`;
 
 L.facturas=()=>{if(!S.facturas.length)return vacio('Todavía no hay facturas. Pulsa «Nueva factura» para crear la primera.');
  const q=norm(Q.facturas);const l=S.facturas.filter(f=>{const p=tot(f).pend>0.004;return FL.fac==='todas'||(FL.fac==='pend'?p:!p)}).filter(f=>!q||norm([f.numero,cliNom(f.clienteId),expDe(f.expedienteId)?.asunto].join(' ')).includes(q)).sort(cmpFac);
@@ -601,7 +617,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='19';
+const VERSION='20';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -778,7 +794,9 @@ const ACT={
  editExp:id=>{const e=byId('expedientes',id);formModal('Editar expediente',campos('expediente'),e,v=>{if(!v.numero)v.numero=e.numero||sigExp();Object.assign(e,v)})},
  delExp:id=>{const ne=S.eventos.filter(x=>x.expedienteId===id).length;if(!confirm(`¿Borrar este expediente?${ne?` Se borrarán también sus ${ne} plazos y citas.`:''} Las facturas se conservan.`))return;
   S.expedientes=S.expedientes.filter(e=>e.id!==id);S.eventos=S.eventos.filter(x=>x.expedienteId!==id);S.facturas.forEach(f=>{if(f.expedienteId===id)f.expedienteId=''});save();go('#expedientes');toast('Expediente borrado')},
- nuevoEv:(id,b)=>formModal('Nuevo plazo o cita',campos('evento'),{tipo:'Plazo',fecha:hoy(),expedienteId:b.dataset.exp||''},v=>{S.eventos.push({id:uid(),hecho:false,...v});toast('Apuntado en la agenda')}),
+ nuevoEv:(id,b)=>{if(!S.expedientes.length){alert('Primero crea o importa un expediente.');return}
+  formModal('Nueva tarea pendiente',[{k:'expedienteId',l:'Expediente',t:'expediente',req:1},{k:'texto',l:'Descripción',t:'area',req:1},{k:'fechaTarea',l:'Fecha de la tarea',t:'date',req:1,half:1},{k:'horaTarea',l:'Hora',t:'time',half:1}],{expedienteId:b.dataset.exp||'',fechaTarea:hoy()},
+   v=>{const e=byId('expedientes',v.expedienteId);const a={id:uid(),fecha:hoy(),texto:v.texto,pendiente:true,fechaTarea:v.fechaTarea};if(v.horaTarea)a.horaTarea=v.horaTarea;(e.actuaciones=e.actuaciones||[]).push(a);toast('Tarea añadida a la agenda y a las actuaciones del expediente')})},
  editEv:id=>{if(String(id).startsWith('act|')){const [,ei,ai]=String(id).split('|');return ACT.editAct(ei,{dataset:{act:ai}})}const e=byId('eventos',id);formModal('Editar plazo o cita',campos('evento'),e,v=>{Object.assign(e,v)},`<button type="button" class="btn ghost dan izq" data-a="delEv" data-id="${id}">Borrar</button>`)},
  terminaTarea:id=>{const ev=byId('eventos',id),x=ev&&expDe(ev.expedienteId);if(!ev)return;
   if(x){const f=ev.fecha&&ev.fecha<hoy()?ev.fecha:hoy(),a={id:uid(),fecha:f,texto:(ev.tipo&&ev.tipo!=='Tarea'?ev.tipo+': ':'')+ev.titulo+(ev.lugar?' ('+ev.lugar+')':'')};if(ev.hora)a.hora=ev.hora;(x.actuaciones=x.actuaciones||[]).push(a)}
