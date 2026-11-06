@@ -178,6 +178,9 @@ body.sin-sesion main{margin:0 auto}
 table.mov{font-size:14.5px}
 table.mov th.ing,table.mov th.gas{color:var(--muted)}
 table.mov tr.editable{cursor:pointer}
+.row.tarea .xt{position:static;flex:none;width:36px;height:36px;font-size:22px}
+.ok-t{flex:none;width:40px;height:40px;border-radius:10px;border:1.5px solid var(--ok);background:transparent;color:var(--ok);font-size:20px;font-weight:600;cursor:pointer}
+.ok-t:hover{background:var(--ok);color:var(--surface)}
 .addcos{display:grid;grid-template-columns:1fr 120px 90px auto;gap:8px}
 @media (max-width:640px){.addcos{grid-template-columns:1fr 1fr}.addcos #csT,.addcos .btn{grid-column:1/-1}}
 table.cos .ap{font-weight:600;width:80px}
@@ -404,7 +407,7 @@ const volver=(h,l)=>`<a class="volver" href="${h}">‹ ${l}</a>`;
 const cab=(t,acc='',sub='')=>`<div class="top"><div class="tit"><h1>${esc(t)}</h1>${sub?`<p class="sub">${sub}</p>`:''}</div><div class="acc">${acc}</div></div>`;
 const sec=(t,acc,cuerpo)=>`<div class="sechead"><h2>${t}</h2>${acc||''}</div>${cuerpo}`;
 const noEnc=(h,l)=>volver(h,l)+vacio('Este registro ya no existe.');
-const Q={},FL={exp:'Abierto',ag:'pend',fac:'pend',cli:'abiertos',ord:'nombre'};
+const Q={},FL={exp:'Abierto',ag:'pend',fac:'pend',cli:'abiertos',ord:'letrado'};
 const buscador=(k,ph)=>`<input class="buscar" type="search" data-q="${k}" value="${esc(Q[k]||'')}" placeholder="${ph}" aria-label="${ph}">`;
 const chips=(k,ops)=>`<div class="chips">${ops.map(([v,l,n])=>`<button type="button" class="chip${FL[k]===v?' on':''}" data-a="filtro" data-k="${k}" data-v="${v}">${l}${n!==undefined?` <span class="cnt">${n.toLocaleString('es-ES')}</span>`:''}</button>`).join('')}</div>`;
 function datos(pares,todos){const p=todos?pares:pares.filter(x=>x[1]);if(!p.length)return '';return `<dl class="panel datos">${p.map(([l,v,html,ancho])=>`<div${ancho?' class="ancho"':''}><dt>${esc(l)}</dt><dd>${html?v:esc(v)}</dd></div>`).join('')}</dl>`}
@@ -431,12 +434,17 @@ function apellidosPrimero(n){n=String(n||'').trim();if(!n||n.includes(','))retur
  let i=t.findIndex(x=>CLAVE.test(x));
  if(i<0){let k=t.length,u=0;while(u<2&&k>1){k--;while(k>1&&PART.includes(norm(t[k-1])))k--;u++}i=k}
  if(i<=0||i>=t.length)return n;return t.slice(i).join(' ')+', '+t.slice(0,i).join(' ')}
+function migrar16(){const a=S.ajustes;if(a.migr>=16)return false;
+ const l=cfgCampos('expediente'),bus=n=>l.find(f=>f.custom&&nrm2(f.l)===n);
+ const mover=['tipo de expediente','cuantia inicial','cuantia final'].map(bus).filter(Boolean);
+ if(mover.length){const resto=l.filter(f=>!mover.includes(f)),ref=bus('su referencia');let i=resto.indexOf(ref);if(i<0)i=resto.findIndex(f=>f.k==='procuradorPropio');resto.splice(i+1,0,...mover);guardarCfg('expediente',resto)}
+ a.migr=16;return true}
 function migrar15(){const a=S.ajustes;if(a.migr>=15)return false;
  const l=cfgCampos('expediente');for(const f of l)if(f.k==='companero'&&/compa/i.test(f.l))f.l='Letrado propio';
  const ref=l.find(f=>f.custom&&nrm2(f.l)==='su referencia');
  const orden=['clienteId','numero','apertura','estado','materia','asunto','situacion','companero','procuradorPropio'];
  const prim=orden.map(k=>l.find(f=>f.k===k)).filter(Boolean);if(ref)prim.push(ref);
- guardarCfg('expediente',[...prim,...l.filter(f=>!prim.includes(f))]);a.migr=15;return true}
+ guardarCfg('expediente',[...prim,...l.filter(f=>!prim.includes(f))]);a.migr=15;migrar16();return true}
 function migrar14(){const a=S.ajustes;if(a.migr>=14)return false;for(const e of S.expedientes)movDesdeActs(e);a.migr=14;migrar15();return true}
 function migrar13(){const a=S.ajustes;if(a.migr>=13)return false;
  for(const c of S.clientes){if(c.letrado)continue;const s=new Set(S.expedientes.filter(e=>e.clienteId===c.id&&abierto(e)&&e.companero).map(e=>e.companero));if(s.size===1)c.letrado=[...s][0]}
@@ -454,7 +462,7 @@ function migrar9(){const a=S.ajustes;if(a.migr>=9)return false;
  for(const e of S.expedientes)if(e.estado==='Archiv'+'ado')e.estado='Cerrado';
  for(const c of S.clientes)if(c.tipo!=='Empresa')c.nombre=apellidosPrimero(c.nombre);
  a.migr=9;migrar10();return true}
-function migrar(){const a=S.ajustes;if(a.migr>=14)return migrar15();if(a.migr>=13)return migrar14();if(a.migr>=12)return migrar13();if(a.migr>=11)return migrar12();if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
+function migrar(){const a=S.ajustes;if(a.migr>=15)return migrar16();if(a.migr>=14)return migrar15();if(a.migr>=13)return migrar14();if(a.migr>=12)return migrar13();if(a.migr>=11)return migrar12();if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
  const quitar=s=>{const n=nrm2(s);return ['banco','iban','bic','entidad','sucursal','dc','cuenta','cuenta contable','cuenta p g c','forma pago','forma de pago','portes','transportista','direccion de envio'].includes(n)||n.includes('envio')||n.includes('bancari')};
  const fuera=((a.campos&&a.campos.cliente)||[]).filter(c=>c.custom&&quitar(c.l)).map(c=>c.k);
  const lista=cfgCampos('cliente').filter(f=>!fuera.includes(f.k));
@@ -464,6 +472,7 @@ function migrar(){const a=S.ajustes;if(a.migr>=14)return migrar15();if(a.migr>=1
   if(c.telefono&&String(c.telefono).includes('; ')&&!c.telefono2){const p=String(c.telefono).split('; ');c.telefono=p[0];for(let i=1;i<p.length&&i<5;i++)c['telefono'+(i+1)]=i===4?p.slice(4).join('; '):p[i]}}
  a.migr=6;migrar9();return true}
 const textoBusq=o=>norm(Object.entries(o).filter(([k])=>k!=='id'&&!k.endsWith('Id')).map(([,v])=>typeof v==='object'?'':v).join(' '));
+function tareaRow(e){return `<div class="row tarea"><div class="txt" data-a="editEv" data-id="${e.id}"><div class="t">${esc(e.titulo)}</div><div class="s">${esc(e.tipo||'')}, ${fFecha(e.fecha)}${e.hora?' a las '+esc(e.hora):''}${e.lugar?', '+esc(e.lugar):''}</div></div><button type="button" class="ok-t" data-a="terminaTarea" data-id="${e.id}" aria-label="Dar por terminada" title="Dar por terminada: pasa a Actuaciones">✓</button><button type="button" class="x xt" data-a="borraTarea" data-id="${e.id}" aria-label="Borrar tarea" title="Borrar (si se apuntó por error)">×</button></div>`}
 function evRow(e){const d=dias(e.fecha),a=Math.abs(d),x=expDe(e.expedienteId);
  const cls=e.hecho?'hecho':d<=0?'urg':d<=3?'pronto':'';
  const blq=d===0?'<b>Hoy</b>':`<b>${a}</b><small>${d<0?(a===1?'día tarde':'días tarde'):(a===1?'día':'días')}</small>`;
@@ -527,12 +536,12 @@ L.expedientes=()=>{if(!S.expedientes.length)return vacio('Todavía no hay expedi
  return l.length?`<div class="list">${l.map(expRow).join('')}</div>`:vacio('Ningún expediente coincide.')};
 V.expedientes=()=>cab('Expedientes',`<button class="btn pri" data-a="nuevoExp">Nuevo expediente</button>`)+chips('exp',[['Abierto','Abiertos',S.expedientes.filter(e=>(e.estado||'Abierto')==='Abierto').length],['Cerrado','Cerrados',S.expedientes.filter(e=>e.estado==='Cerrado').length],['todos','Todos',S.expedientes.length]])+buscador('expedientes','Buscar por número, asunto, cliente, autos…')+`<div id="lst">${L.expedientes()}</div>`;
 V.expediente=id=>{const e=byId('expedientes',id);if(!e)return noEnc('#expedientes','Expedientes');
- const ev=S.eventos.filter(x=>x.expedienteId===id).sort((a,b)=>(a.hecho-b.hecho)||cmpEv(a,b));
+ const ev=S.eventos.filter(x=>x.expedienteId===id&&!x.hecho).sort(cmpEv);
  const act=[...(e.actuaciones||[])].sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
  const fa=S.facturas.filter(f=>f.expedienteId===id).sort(cmpFac);
  return volver('#expedientes','Expedientes')+cab('Expediente '+e.numero,`<button class="btn" data-a="editExp" data-id="${id}">Editar</button><button class="btn ghost dan" data-a="delExp" data-id="${id}">Borrar</button>`,`<a href="#cliente/${e.clienteId}">${esc(cliNom(e.clienteId))}</a>`)+
  ficha('expediente',e,['numero'])+
- sec('Plazos y citas',`<button class="btn sm" data-a="nuevoEv" data-exp="${id}">Añadir</button>`,ev.length?`<div class="list">${ev.map(evRow).join('')}</div>`:vacio('Sin plazos ni citas.'))+
+ sec('Tareas pendientes',`<button class="btn sm" data-a="nuevoEv" data-exp="${id}">Añadir</button>`,ev.length?`<div class="list">${ev.map(tareaRow).join('')}</div>`:vacio('Sin tareas pendientes.'))+
  sec('Actuaciones','',`<div class="panel"><div class="addact"><input type="date" id="actF" value="${hoy()}" aria-label="Fecha"><textarea id="actT" rows="2" placeholder="Escrito presentado, llamada, notificación…" aria-label="Actuación"></textarea><button class="btn pri" data-a="addAct" data-id="${id}">Añadir</button></div>${act.length?`<ol class="tl">${act.map(a=>`<li><time>${fFecha(a.fecha)}${a.hora?', '+esc(a.hora):''}</time><p>${esc(a.texto)}</p>${a.importe?`<p class="actimp ${a.importe<0?'neg':''}">${eur(a.importe)}</p>`:''}<button type="button" class="x" data-a="delAct" data-id="${id}" data-act="${a.id}" aria-label="Borrar actuación">×</button></li>`).join('')}</ol>`:''}</div>`)+
  sec('Previsión de honorarios pendientes','',prevHTML(e))+
  sec('Ingresos y gastos','',movHTML(e))+
@@ -572,7 +581,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='16';
+const VERSION='18';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -751,6 +760,10 @@ const ACT={
   S.expedientes=S.expedientes.filter(e=>e.id!==id);S.eventos=S.eventos.filter(x=>x.expedienteId!==id);S.facturas.forEach(f=>{if(f.expedienteId===id)f.expedienteId=''});save();go('#expedientes');toast('Expediente borrado')},
  nuevoEv:(id,b)=>formModal('Nuevo plazo o cita',campos('evento'),{tipo:'Plazo',fecha:hoy(),expedienteId:b.dataset.exp||''},v=>{S.eventos.push({id:uid(),hecho:false,...v});toast('Apuntado en la agenda')}),
  editEv:id=>{const e=byId('eventos',id);formModal('Editar plazo o cita',campos('evento'),e,v=>{Object.assign(e,v)},`<button type="button" class="btn ghost dan izq" data-a="delEv" data-id="${id}">Borrar</button>`)},
+ terminaTarea:id=>{const ev=byId('eventos',id),x=ev&&expDe(ev.expedienteId);if(!ev)return;
+  if(x){const f=ev.fecha&&ev.fecha<hoy()?ev.fecha:hoy(),a={id:uid(),fecha:f,texto:(ev.tipo&&ev.tipo!=='Tarea'?ev.tipo+': ':'')+ev.titulo+(ev.lugar?' ('+ev.lugar+')':'')};if(ev.hora)a.hora=ev.hora;(x.actuaciones=x.actuaciones||[]).push(a)}
+  S.eventos=S.eventos.filter(e=>e.id!==id);save();render();toast(x?'Tarea terminada: anotada en Actuaciones':'Tarea terminada')},
+ borraTarea:id=>{const ev=byId('eventos',id);if(!ev||!confirm(`¿Borrar «${ev.titulo}» sin anotarla en Actuaciones? Úsalo solo si se apuntó por error.`))return;S.eventos=S.eventos.filter(e=>e.id!==id);save();render();toast('Tarea borrada')},
  delEv:id=>{if(!confirm('¿Borrar este plazo o cita?'))return;S.eventos=S.eventos.filter(e=>e.id!==id);dlg.close();save();render();toast('Borrado')},
  addAct:id=>{const t=$('#actT').value.trim();if(!t){$('#actT').focus();return}const e=byId('expedientes',id);(e.actuaciones=e.actuaciones||[]).push({id:uid(),fecha:$('#actF').value||hoy(),texto:t});save();render();toast('Actuación añadida')},
  delAct:(id,b)=>{if(!confirm('¿Borrar esta actuación?'))return;const e=byId('expedientes',id);e.actuaciones=(e.actuaciones||[]).filter(a=>a.id!==b.dataset.act);save();render()},
