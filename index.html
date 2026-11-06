@@ -690,13 +690,13 @@ L.agenda=()=>{const TE=todosEventos().filter(e=>!e.hecho);if(!TE.length)return v
 V.agenda=()=>cab('Agenda',`<button class="btn pri" data-a="nuevoEv">Nueva tarea</button>`)+`<p class="nota" style="margin-top:-8px">Ordenadas de la más cercana a hoy a la más lejana. Las pasadas se ven en rojo y siguen aquí hasta que las des por terminadas en su expediente.</p>`+buscador('agenda','Buscar por expediente, cliente o tarea…')+`<div id="lst">${L.agenda()}</div>`;
 
 FL.prev='importe';
-function prevRow(e){return `<a class="row pv" href="#expediente/${e.id}"><div class="pvx">${esc(e.numero)}</div><div class="pva">${esc(e.asunto&&e.asunto!==e.numero?e.asunto:'—')}</div><div class="pvc">${esc(cliNom(e.clienteId))}${abierto(e)?'':' <span class="tag">Cerrado</span>'}</div><div class="pvi">${eur(num(e.prevHonorarios))}</div></a>`}
-L.prevision=()=>{const q=norm(Q.prevision);let l=S.expedientes.filter(e=>num(e.prevHonorarios)>0);if(!l.length)return vacio('Ningún expediente tiene previsión de honorarios pendientes.');
+function prevRow(e){return `<a class="row pv" href="#expediente/${e.id}"><div class="pvx">${esc(e.numero)}</div><div class="pva">${esc(e.asunto&&e.asunto!==e.numero?e.asunto:'—')}</div><div class="pvc">${esc(cliNom(e.clienteId))}</div><div class="pvi">${eur(num(e.prevHonorarios))}</div></a>`}
+L.prevision=()=>{const q=norm(Q.prevision);let l=S.expedientes.filter(e=>abierto(e)&&num(e.prevHonorarios)>0);if(!l.length)return vacio('Ningún expediente abierto tiene previsión de honorarios pendientes.');
  l=l.filter(e=>!q||norm([e.numero,e.asunto,cliNom(e.clienteId)].join(' ')).includes(q));
  const o={importe:(a,b)=>num(b.prevHonorarios)-num(a.prevHonorarios),cliente:(a,b)=>cliNom(a.clienteId).localeCompare(cliNom(b.clienteId),'es'),expediente:(a,b)=>String(a.numero).localeCompare(String(b.numero),'es',{numeric:true})}[FL.prev];l.sort(o);
  if(!l.length)return vacio('Ningún expediente coincide con la búsqueda.');const t=l.reduce((s,e)=>s+num(e.prevHonorarios),0);
  return `<div class="panel totprev"><span class="nota">${l.length===1?'1 expediente':l.length.toLocaleString('es-ES')+' expedientes'}</span><span class="importe">${eur(r2(t))}</span></div><div class="list prevl"><div class="row pv cabag"><div class="pvx">Expediente</div><div class="pva">Asunto</div><div class="pvc">Cliente</div><div class="pvi">Importe</div></div>${l.map(prevRow).join('')}</div>`};
-V.prevision=()=>cab('Previsión de honorarios pendientes')+`<div class="orden"><span class="nota">Ordenar por</span>${chips('prev',[['importe','Importe'],['cliente','Cliente'],['expediente','Expediente']])}</div>`+buscador('prevision','Buscar por expediente, asunto o cliente…')+`<div id="lst">${L.prevision()}</div>`;
+V.prevision=()=>cab('Previsión de honorarios pendientes','','Solo expedientes abiertos')+`<div class="orden"><span class="nota">Ordenar por</span>${chips('prev',[['importe','Importe'],['cliente','Cliente'],['expediente','Expediente']])}</div>`+buscador('prevision','Buscar por expediente, asunto o cliente…')+`<div id="lst">${L.prevision()}</div>`;
 L.facturas=()=>{if(!S.facturas.length)return vacio('Todavía no hay facturas. Pulsa «Nueva factura» para crear la primera.');
  const q=norm(Q.facturas);const l=S.facturas.filter(f=>{const p=tot(f).pend>0.004;return FL.fac==='todas'||(FL.fac==='pend'?p:!p)}).filter(f=>!q||norm([f.numero,cliNom(f.clienteId),expDe(f.expedienteId)?.asunto].join(' ')).includes(q)).sort(cmpFac);
  return l.length?`<div class="list">${l.map(facRow).join('')}</div>`:vacio('No hay facturas con este filtro.')};
@@ -723,7 +723,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='31';
+const VERSION='32';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
