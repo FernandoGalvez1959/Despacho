@@ -232,10 +232,10 @@ table.mov tr.editable{cursor:pointer}
 @media (max-width:520px){.row.copia .txt{flex-basis:100%}}
 .ok-t{flex:none;width:40px;height:40px;border-radius:10px;border:1.5px solid var(--ok);background:transparent;color:var(--ok);font-size:20px;font-weight:600;cursor:pointer}
 .ok-t:hover{background:var(--ok);color:var(--surface)}
-.addcos{display:grid;grid-template-columns:1fr 120px 90px auto;gap:8px}
+.addcos{display:grid;grid-template-columns:1fr 120px 110px auto;gap:8px}
 @media (max-width:640px){.addcos{grid-template-columns:1fr 1fr}.addcos #csT,.addcos .btn{grid-column:1/-1}}
 table.cos .ap{font-weight:600;width:80px}
-table.cos .ap-S{color:var(--ok)}table.cos .ap-P{color:var(--warn)}table.cos .ap-O{color:var(--danger)}
+table.cos .ap-TA{color:var(--ok)}table.cos .ap-PE{color:var(--warn)}table.cos .ap-IM{color:var(--danger)}
 table.mov tbody tr.editable:hover td{background:var(--bg)}
 .impm,.fm{display:none}
 table.mov .fm{font-size:12px;color:var(--muted)}
@@ -603,14 +603,15 @@ function unirDuplicados(){let ne=0,na=0,nc=0;
  // Actuaciones repetidas dentro de un expediente (se conserva la pendiente o la modificada)
  for(const e of S.expedientes){const vis=new Map(),res=[];for(const a of e.actuaciones||[]){const k=claveAct(a);if(vis.has(k)){const p=vis.get(k);if(a.pendiente&&!p.pendiente)Object.assign(p,{pendiente:true,fechaTarea:a.fechaTarea,horaTarea:a.horaTarea});na++;continue}vis.set(k,a);res.push(a)}if(e.actuaciones)e.actuaciones=res}
  return{ne,na,nc}}
+function migrar22(){const a=S.ajustes;if(a.migr>=22)return false;const M={S:'TA',P:'PE',O:'IM'};for(const e of S.expedientes)for(const c of e.costas||[])if(M[c.aprobadas])c.aprobadas=M[c.aprobadas];a.migr=22;return true}
 function migrar21(){const a=S.ajustes;if(a.migr>=21)return false;let n=0;
  for(const e of S.expedientes){const t=String(e.numero||'');if(/\n/.test(t)||/\s-(\s|$)/.test(t)){const pn=partirNumero(t);if(pn.numero&&/\d/.test(pn.numero)&&pn.numero.length<=30){if(!e.asunto||e.asunto===t)e.asunto=pn.asunto||pn.numero;e.numero=pn.numero;n++}}}
- const r=unirDuplicados();a.migr=21;if(n||r.ne)setTimeout(()=>toast(`Corregidos ${n} números de expediente. `+textoDup(r)),900);return true}
+ const r=unirDuplicados();a.migr=21;migrar22();if(n||r.ne)setTimeout(()=>toast(`Corregidos ${n} números de expediente. `+textoDup(r)),900);return true}
 function migrar20(){const a=S.ajustes;if(a.migr>=20)return false;const r=unirDuplicados();a.migr=20;if(r.ne||r.na||r.nc)setTimeout(()=>toast(textoDup(r)),700);migrar21();return true}
 function migrar19(){const a=S.ajustes;if(a.migr>=19)return false;for(const e of S.expedientes)e.estado=estadoN(e);a.migr=19;migrar20();return true}
 function migrar18(){const a=S.ajustes;if(a.migr>=18)return false;const r=unirDuplicados();a.migr=18;if(r.ne||r.na||r.nc)setTimeout(()=>toast(textoDup(r)),600);migrar19();return true}
 const textoDup=r=>r.ne||r.na||r.nc?`Unidos: ${r.ne} expedientes duplicados, ${r.na} actuaciones repetidas y ${r.nc} clientes duplicados.`:'No se han encontrado duplicados.';
-function migrar(){if(S.ajustes.migr>=20)return migrar21();if(S.ajustes.migr>=19)return migrar20();if(S.ajustes.migr>=18)return migrar19();if(S.ajustes.migr>=17)return migrar18();const a=S.ajustes;if(a.migr>=16)return migrar17();if(a.migr>=15)return migrar16();if(a.migr>=14)return migrar15();if(a.migr>=13)return migrar14();if(a.migr>=12)return migrar13();if(a.migr>=11)return migrar12();if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
+function migrar(){if(S.ajustes.migr>=21)return migrar22();if(S.ajustes.migr>=20)return migrar21();if(S.ajustes.migr>=19)return migrar20();if(S.ajustes.migr>=18)return migrar19();if(S.ajustes.migr>=17)return migrar18();const a=S.ajustes;if(a.migr>=16)return migrar17();if(a.migr>=15)return migrar16();if(a.migr>=14)return migrar15();if(a.migr>=13)return migrar14();if(a.migr>=12)return migrar13();if(a.migr>=11)return migrar12();if(a.migr>=10)return migrar11();if(a.migr>=9)return migrar10();if(a.migr>=6)return migrar9();
  const quitar=s=>{const n=nrm2(s);return ['banco','iban','bic','entidad','sucursal','dc','cuenta','cuenta contable','cuenta p g c','forma pago','forma de pago','portes','transportista','direccion de envio'].includes(n)||n.includes('envio')||n.includes('bancari')};
  const fuera=((a.campos&&a.campos.cliente)||[]).filter(c=>c.custom&&quitar(c.l)).map(c=>c.k);
  const lista=cfgCampos('cliente').filter(f=>!fuera.includes(f.k));
@@ -647,10 +648,10 @@ function movHTML(e){const l=[...(e.movimientos||[])].sort((a,b)=>String(a.fecha)
  const filas=l.map(m=>{const i=num(m.ingreso),g=num(m.gasto);s=r2(s+i-g);ti+=i;tg+=g;return `<tr class="editable" data-a="editMov" data-id="${e.id}" data-mov="${m.id}" title="Pulsa para modificar"><td class="fc">${fCorta(m.fecha)}</td><td>${esc(m.concepto)}<small class="fm">${fCorta(m.fecha)}</small></td><td class="r ing">${i?eur(i):''}</td><td class="r gas">${g?eur(g):''}</td><td class="r impm ${i-g<0?'gas':'ing'}">${eur(i-g)}</td><td class="r sal${s<0?' neg':''}">${eur(s)}</td><td class="c"><button type="button" class="x" data-a="delMov" data-id="${e.id}" data-mov="${m.id}" aria-label="Borrar movimiento">×</button></td></tr>`}).join('');
  return `<div class="panel"><div class="addmov"><input type="date" id="mvF" value="${hoy()}" aria-label="Fecha"><input id="mvC" placeholder="Concepto" aria-label="Concepto"><input id="mvI" inputmode="decimal" placeholder="Ingreso €" aria-label="Ingreso"><input id="mvG" inputmode="decimal" placeholder="Gasto €" aria-label="Gasto"><button class="btn pri" data-a="addMov" data-id="${e.id}">Añadir</button></div>
  ${l.length?`<div class="tabla"><table class="mov"><thead><tr><th class="fc">Fecha</th><th>Concepto</th><th class="r ing">Ingreso</th><th class="r gas">Gasto</th><th class="r impm">Importe</th><th class="r">Saldo</th><th></th></tr></thead><tbody>${filas}</tbody><tfoot><tr><td class="fc"></td><td>Totales</td><td class="r ing">${eur(r2(ti))}</td><td class="r gas">${eur(r2(tg))}</td><td class="r impm"></td><td class="r sal${s<0?' neg':''}">${eur(s)}</td><td></td></tr></tfoot></table></div>`:'<p class="nota" style="margin:12px 0 0">Sin movimientos.</p>'}</div>`}
-const APROB={S:'S',P:'P',O:'O'};
+const APROB={TA:'TA',PE:'PE',IM:'IM'};
 function costasHTML(e){const l=e.costas||[];let t=0;
  const filas=l.map(c=>{const v=num(c.importe);t+=v;return `<tr class="editable" data-a="editCosta" data-id="${e.id}" data-costa="${c.id}" title="Pulsa para modificar"><td>${esc(c.texto)}</td><td class="r">${eur(v)}</td><td class="c ap ap-${esc(c.aprobadas||'')}">${esc(c.aprobadas||'')}</td><td class="c"><button type="button" class="x" data-a="delCosta" data-id="${e.id}" data-costa="${c.id}" aria-label="Borrar">×</button></td></tr>`}).join('');
- return `<div class="panel"><div class="addcos"><input id="csT" placeholder="Texto" aria-label="Texto"><input id="csI" inputmode="decimal" placeholder="Importe €" aria-label="Importe"><select id="csA" aria-label="Aprobadas">${opt('','S/P/O',1)}${Object.keys(APROB).map(k=>opt(k,k,0)).join('')}</select><button class="btn pri" data-a="addCosta" data-id="${e.id}">Añadir</button></div>
+ return `<div class="panel"><div class="addcos"><input id="csT" placeholder="Texto" aria-label="Texto"><input id="csI" inputmode="decimal" placeholder="Importe €" aria-label="Importe"><select id="csA" aria-label="Aprobadas">${opt('','TA/PE/IM',1)}${Object.keys(APROB).map(k=>opt(k,k,0)).join('')}</select><button class="btn pri" data-a="addCosta" data-id="${e.id}">Añadir</button></div>
  ${l.length?`<div class="tabla"><table class="mov cos"><thead><tr><th>Texto</th><th class="r">Importe</th><th class="c">Aprobadas</th><th></th></tr></thead><tbody>${filas}</tbody><tfoot><tr><td>Total</td><td class="r">${eur(r2(t))}</td><td></td><td></td></tr></tfoot></table></div>`:'<p class="nota" style="margin:12px 0 0">Sin costas.</p>'}</div>`}
 let abrirURL=u=>{location.href=u};
 function mailActuacion(id,actId){const e=byId('expedientes',id),a=(e.actuaciones||[]).find(x=>x.id===actId);if(!e||!a)return;const c=byId('clientes',e.clienteId)||{};
@@ -763,7 +764,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='36';
+const VERSION='37';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -1004,7 +1005,7 @@ const ACT={
   (e.costas=e.costas||[]).push({id:uid(),texto:t,importe:i,aprobadas:$('#csA').value});save();render();toast('Costas añadidas')},
  delCosta:(id,b)=>{if(!confirm('¿Borrar esta línea de costas?'))return;const e=byId('expedientes',id);e.costas=(e.costas||[]).filter(c=>c.id!==b.dataset.costa);if(dlg.open)dlg.close();save();render()},
  editCosta:(id,b)=>{const e=byId('expedientes',id),c=(e.costas||[]).find(x=>x.id===b.dataset.costa);if(!c)return;
-  formModal('Modificar costas',[{k:'texto',l:'Texto',req:1},{k:'importe',l:'Importe (€)',t:'number',half:1},{k:'aprobadas',l:'Aprobadas',t:'select',o:['','S','P','O'],half:1}],{texto:c.texto,importe:num(c.importe)?num(c.importe).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}):'',aprobadas:c.aprobadas||''},
+  formModal('Modificar costas',[{k:'texto',l:'Texto',req:1},{k:'importe',l:'Importe (€)',t:'number',half:1},{k:'aprobadas',l:'Aprobadas',t:'select',o:['','TA','PE','IM'],half:1}],{texto:c.texto,importe:num(c.importe)?num(c.importe).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}):'',aprobadas:c.aprobadas||''},
    v=>{c.texto=v.texto;c.importe=parseImp(v.importe);c.aprobadas=v.aprobadas;toast('Costas modificadas')},`<button type="button" class="btn ghost dan izq" data-a="delCosta" data-id="${id}" data-costa="${c.id}">Borrar</button>`)},
  editMov:(id,b)=>{const e=byId('expedientes',id),m=(e.movimientos||[]).find(x=>x.id===b.dataset.mov);if(!m)return;const f2=n=>num(n)?num(n).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
   formModal('Modificar movimiento',[{k:'fecha',l:'Fecha',t:'date',req:1,half:1},{k:'concepto',l:'Concepto',req:1},{k:'ingreso',l:'Ingreso (€)',t:'number',half:1},{k:'gasto',l:'Gasto (€)',t:'number',half:1}],{fecha:m.fecha,concepto:m.concepto,ingreso:f2(m.ingreso),gasto:f2(m.gasto)},
