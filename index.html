@@ -216,6 +216,7 @@ table.mov tr.editable{cursor:pointer}
 .badges span{font-size:12.5px;padding:2px 8px;border-radius:6px;white-space:nowrap}
 .b-sit{background:var(--accent-soft);color:var(--accent)}
 .b-rev{background:var(--danger-soft);color:var(--danger)}
+.badges.sobre span{background:var(--surface);border:1px solid currentColor}
 .ok-t{flex:none;width:40px;height:40px;border-radius:10px;border:1.5px solid var(--ok);background:transparent;color:var(--ok);font-size:20px;font-weight:600;cursor:pointer}
 .ok-t:hover{background:var(--ok);color:var(--surface)}
 .addcos{display:grid;grid-template-columns:1fr 120px 90px auto;gap:8px}
@@ -584,7 +585,7 @@ function evRow(e){const d=dias(e.fecha),a=Math.abs(d),x=expDe(e.expedienteId);
 const estadoN=e=>/cerr|archiv|baja|finaliz|termin|conclu/i.test(String(e.estado||''))?'Cerrado':'Abierto';
 const abierto=e=>estadoN(e)==='Abierto';
 function expDeCli(id){const ord=(a,b)=>String(a.apertura||'9999').localeCompare(String(b.apertura||'9999'))||String(a.numero).localeCompare(String(b.numero),'es',{numeric:true});const l=S.expedientes.filter(e=>e.clienteId===id);return [...l.filter(abierto).sort(ord),...l.filter(e=>!abierto(e)).sort(ord)]}
-const expRowCli=e=>{const j=limpiaJuzgado(e.juzgado),solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?(j||'Sin juzgado'):e.asunto)}</div><div class="s">${esc([e.situacion?'Situación: '+e.situacion:'Sin situación',solo?'':j].filter(Boolean).join(' · '))}</div></div>${abierto(e)?'':'<span class="tag">Cerrado</span>'}</a>`};
+const expRowCli=e=>{const j=limpiaJuzgado(e.juzgado),solo=!e.asunto||e.asunto===e.numero;return `<a class="row ${abierto(e)?'exp-ab':'exp-ce'}" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?(j||'Sin juzgado'):e.asunto)}</div>${!solo&&j?`<div class="s">${esc(j)}</div>`:''}<div class="badges sobre"><span class="b-sit">${e.situacion?esc(e.situacion):'Sin situación'}</span><span class="b-rev">${e.ultimaRevision?'Revisado '+fLarga(e.ultimaRevision):'Sin revisar'}</span></div></div>${abierto(e)?'':'<span class="tag">Cerrado</span>'}</a>`};
 function expRow(e){const solo=!e.asunto||e.asunto===e.numero;return `<a class="row" href="#expediente/${e.id}"><div class="num">${esc(e.numero)}</div><div class="txt"><div class="t">${esc(solo?cliNom(e.clienteId):e.asunto)}</div><div class="s">${esc([solo?'':cliNom(e.clienteId),e.materia,limpiaJuzgado(e.juzgado)].filter(Boolean).join(', '))}</div><div class="badges"><span class="b-sit">${e.situacion?esc(e.situacion):'Sin situación'}</span><span class="b-rev">${e.ultimaRevision?'Revisado '+fLarga(e.ultimaRevision):'Sin revisar'}</span></div></div>${e.companero?`<span class="abog">${esc(e.companero)}</span>`:''}${abierto(e)?'':'<span class="tag">Cerrado</span>'}</a>`}
 function facRow(f){const t=tot(f),x=expDe(f.expedienteId);return `<a class="row" href="#factura/${f.id}"><div class="num">${esc(f.numero)}</div><div class="txt"><div class="t">${esc(cliNom(f.clienteId))}</div><div class="s">${fFecha(f.fecha)}${x?', '+esc(x.asunto):''}</div></div><div class="imp"><b>${eur(t.total)}</b>${t.pend>0.004?`<small class="pend">Pendiente ${eur(t.pend)}</small>`:'<small class="ok">Cobrada</small>'}</div></a>`}
 function movDesdeActs(e){const acts=(e.actuaciones||[]).filter(a=>num(a.importe));if(!acts.length)return 0;
@@ -704,7 +705,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='28';
+const VERSION='29';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
