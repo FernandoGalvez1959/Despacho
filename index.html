@@ -170,6 +170,8 @@ body.sin-sesion main{margin:0 auto}
 .orden{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .orden .chips{margin-bottom:12px}.orden .nota{margin-bottom:12px}
 .mes .cnt{font-weight:400;font-size:13px}
+.mes.grp{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;color:var(--ink)}
+.mes.grp .cnt{color:var(--muted);font-size:13.5px}
 .prev{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .prev .addact{flex:1;min-width:220px}
 .addmov{display:grid;grid-template-columns:150px 1fr 110px 110px auto;gap:8px}
@@ -188,7 +190,7 @@ table.mov tr.editable{cursor:pointer}
 .tl li.pte .estado-t{color:var(--warn);font-weight:600}
 .tl li.pte::before{background:var(--warn)}
 .tri{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 16px}
-.list.agenda .row.ag{display:grid;grid-template-columns:92px 140px minmax(140px,1fr) 2fr;gap:12px;align-items:baseline;padding:11px 16px}
+.list.agenda .row.ag{display:grid;grid-template-columns:108px 140px minmax(140px,1fr) 2fr;gap:12px;align-items:baseline;padding:11px 16px}
 .row.ag .agf{font-variant-numeric:tabular-nums;font-weight:600}
 .row.ag .agf small{display:block;font-weight:400;color:var(--muted);font-size:13px}
 .row.ag .agx{font-variant-numeric:tabular-nums;color:var(--muted);font-size:14.5px}
@@ -198,7 +200,7 @@ table.mov tr.editable{cursor:pointer}
 .row.ag.hoy .agf{color:var(--accent)}
 .row.cabag{background:var(--bg)}
 .row.cabag div{font-weight:500!important;color:var(--muted)!important;font-size:12.5px!important}
-@media (max-width:640px){.list.agenda .row.ag{grid-template-columns:72px 1fr;grid-template-areas:"f x" "f c" "f t";gap:2px 12px}
+@media (max-width:640px){.list.agenda .row.ag{grid-template-columns:92px 1fr;grid-template-areas:"f x" "f c" "f t";gap:2px 12px}
  .row.ag .agf{grid-area:f}.row.ag .agx{grid-area:x}.row.ag .agc{grid-area:c}.row.ag .agt{grid-area:t}.row.cabag{display:none!important}}
 .ok-t{flex:none;width:40px;height:40px;border-radius:10px;border:1.5px solid var(--ok);background:transparent;color:var(--ok);font-size:20px;font-weight:600;cursor:pointer}
 .ok-t:hover{background:var(--ok);color:var(--surface)}
@@ -521,6 +523,7 @@ function movDesdeActs(e){const acts=(e.actuaciones||[]).filter(a=>num(a.importe)
  for(const a of acts){const v=num(a.importe);if(v<0){cargos+=-v;continue}abonos+=v;const k=a.fecha+'|'+a.texto;
   if(!ya.has(k)){e.movimientos.push({id:uid(),k,fecha:a.fecha,concepto:String(a.texto||'').replace(/^Entrega a cuenta de honorarios:\s*/i,'').trim()||'Entrega a cuenta',ingreso:r2(v),gasto:0});ya.add(k);n++}}
  if(e.prevHonorarios===undefined&&cargos)e.prevHonorarios=r2(Math.max(0,cargos-abonos));return n}
+const fLarga=f=>{if(!f)return '';const d=new Date(f+'T00:00');return isNaN(d)?f:d.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'})};
 const fCorta=f=>{if(!f)return '';const d=new Date(f+'T00:00');return isNaN(d)?f:d.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit'})};
 function prevHTML(e){const v=num(e.prevHonorarios);return `<div class="panel"><div class="prev">${v?`<span class="importe">${eur(v)}</span>`:'<span class="nota">Sin previsión</span>'}<div class="addact" style="grid-template-columns:1fr auto"><input id="prevH" inputmode="decimal" value="${v?v.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}):''}" placeholder="Importe en €" aria-label="Previsión de honorarios pendientes"><button class="btn" data-a="guardaPrev" data-id="${e.id}">Guardar</button></div></div></div>`}
 function movHTML(e){const l=[...(e.movimientos||[])].sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));let s=0,ti=0,tg=0;
@@ -555,7 +558,8 @@ L.clientes=()=>{if(!S.clientes.length)return vacio('Todavía no hay clientes. Pu
  if(FL.ord!=='letrado')return `<div class="list">${l.map(c=>fila(c,1)).join('')}</div>`;
  const grupos={};for(const c of l)(grupos[c.letrado||'']=grupos[c.letrado||'']||[]).push(c);
  const orden=Object.keys(grupos).sort((a,b)=>(!a)-(!b)||a.localeCompare(b,'es'));
- return orden.map(k=>`<h3 class="mes">${k?esc(k):'Sin letrado asignado'} <span class="cnt">${grupos[k].length}</span></h3><div class="list">${grupos[k].map(c=>fila(c,0)).join('')}</div>`).join('')};
+ const plu=(n,s,p)=>n.toLocaleString('es-ES')+' '+(n===1?s:p);
+ return orden.map(k=>{const nc=grupos[k].length,ne=grupos[k].reduce((s,c)=>s+((m[c.id]||{}).ab||0),0);return `<h3 class="mes grp">${k?esc(k):'Sin letrado asignado'} <span class="cnt">${plu(nc,'cliente','clientes')} · ${plu(ne,'expediente abierto','expedientes abiertos')}</span></h3><div class="list">${grupos[k].map(c=>fila(c,0)).join('')}</div>`}).join('')};
 V.clientes=()=>{const m=estadoCli(),ab=S.clientes.filter(c=>m[c.id]&&m[c.id].ab).length,ce=S.clientes.filter(c=>m[c.id]&&!m[c.id].ab&&m[c.id].ce).length;
  return cab('Clientes',`<button class="btn pri" data-a="nuevoCli">Nuevo cliente</button>`)+chips('cli',[['abiertos','Con expedientes abiertos',ab],['cerrados','Solo cerrados',ce],['todos','Todos',S.clientes.length]])+`<div class="orden"><span class="nota">Ordenar por</span>${chips('ord',[['nombre','Nombre'],['letrado','Letrado']])}</div>`+buscador('clientes','Buscar por nombre, NIF, teléfono, letrado…')+`<div id="lst">${L.clientes()}</div>`};
 const VER_EC={};
@@ -583,7 +587,7 @@ V.expediente=id=>{const e=byId('expedientes',id);if(!e)return noEnc('#expediente
  sec('Ingresos y gastos','',movHTML(e))+
  sec('Costas','',costasHTML(e))};
 
-function agendaRow(ev){const x=expDe(ev.expedienteId),d=dias(ev.fecha);return `<a class="row ag${d<0?' pasada':d===0?' hoy':''}" href="#expediente/${ev.expedienteId}"><div class="agf">${fCorta(ev.fecha)}${ev.hora?`<small>${esc(ev.hora)}</small>`:''}</div><div class="agx">${x?esc(x.numero):''}</div><div class="agc">${x?esc(cliNom(x.clienteId)):''}</div><div class="agt">${esc(ev.titulo)}</div></a>`}
+function agendaRow(ev){const x=expDe(ev.expedienteId),d=dias(ev.fecha);return `<a class="row ag${d<0?' pasada':d===0?' hoy':''}" href="#expediente/${ev.expedienteId}"><div class="agf">${fLarga(ev.fecha)}${ev.hora?`<small>${esc(ev.hora)}</small>`:''}</div><div class="agx">${x?esc(x.numero):''}</div><div class="agc">${x?esc(cliNom(x.clienteId)):''}</div><div class="agt">${esc(ev.titulo)}</div></a>`}
 const cercania=(a,b)=>{const da=dias(a.fecha),db=dias(b.fecha);return Math.abs(da)-Math.abs(db)||db-da||String(a.hora||'99').localeCompare(String(b.hora||'99'))};
 L.agenda=()=>{const TE=todosEventos().filter(e=>!e.hecho);if(!TE.length)return vacio('No hay tareas pendientes. Se añaden desde las actuaciones de cada expediente.');
  const q=norm(Q.agenda);const l=TE.filter(e=>{if(!q)return true;const x=expDe(e.expedienteId);return norm([e.titulo,x?.numero,x?.asunto,x&&cliNom(x.clienteId)].join(' ')).includes(q)}).sort(cercania);
@@ -617,7 +621,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='20';
+const VERSION='21';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
