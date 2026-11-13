@@ -230,6 +230,11 @@ table.mov tr.editable{cursor:pointer}
 .aviso-copia{display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap;padding:12px 14px;margin-bottom:16px;border-radius:12px;background:var(--warn-soft);color:var(--ink);font-size:15px}
 .row.copia{flex-wrap:wrap}
 @media (max-width:520px){.row.copia .txt{flex-basis:100%}}
+.jzl .row.jz{align-items:flex-start}
+.jzl .row.jz>input[type=checkbox]{width:22px;height:22px;min-height:0;flex:none;margin-top:4px;accent-color:var(--accent)}
+.jzl .jzv{margin-top:6px;min-height:0;resize:vertical;line-height:1.35}
+.jzl .jzm{margin-top:4px;font-size:13px;color:var(--warn)}
+.jzl .row.jz.revisar{background:var(--warn-soft)}
 .ok-t{flex:none;width:40px;height:40px;border-radius:10px;border:1.5px solid var(--ok);background:transparent;color:var(--ok);font-size:20px;font-weight:600;cursor:pointer}
 .ok-t:hover{background:var(--ok);color:var(--surface)}
 .addcos{display:grid;grid-template-columns:1fr 120px 110px auto;gap:8px}
@@ -442,6 +447,7 @@ const F={
   {k:'situacion',l:'Situación del expediente',t:'lista',lista:'situaciones'},
   {k:'estado',l:'Estado',t:'select',o:['Abierto','Cerrado'],half:1},
   {k:'juzgado',l:'Juzgado o tribunal'},
+  {k:'juzgadoAnterior',l:'Denominación anterior del juzgado'},
   {k:'autos',l:'Nº de procedimiento (autos)'},
   {k:'contrario',l:'Parte contraria'},
   {k:'letradoContrario',l:'Letrado contrario',half:1},
@@ -768,7 +774,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='42';
+const VERSION='43';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -878,6 +884,7 @@ function importar(){hacerCopia('Antes de importar',true);const d=IMP.dest,m=Obje
    o.clienteId=c?c.id:'';o.apertura=toISO(o.apertura);o.estado=estadoN(o);o.materia=o.materia?cap(o.materia.toLowerCase()):'';
    let e=o.numero?buscaExp(o.numero,o.clienteId):null;
    if(e&&String(o.numero).trim().length<String(e.numero).trim().length)o.numero=e.numero;
+   if(e&&e.juzgadoAnterior&&o.juzgado&&norm(o.juzgado)===norm(e.juzgadoAnterior))delete o.juzgado;
    if(e){pon(e,o);act++}else{o.asunto=o.asunto||o.numero;o.numero=o.numero||sigExp();e={id:uid(),actuaciones:[],...o};S.expedientes.push(e);n++}
    if(r.__acts){e.actuaciones=e.actuaciones||[];const ya=new Set(e.actuaciones.map(a=>a.fecha+'|'+a.texto)),h0=hoy();
     for(const a of r.__acts){const key=a.fecha+'|'+a.texto;if(!ya.has(key)){const na={id:uid(),fecha:a.fecha,texto:a.texto};if(a.hora)na.hora=a.hora;if(a.importe)na.importe=a.importe;e.actuaciones.push(na);ya.add(key);nAct++}
@@ -895,7 +902,7 @@ function importar(){hacerCopia('Antes de importar',true);const d=IMP.dest,m=Obje
  const dup=unirDuplicados();
  save();Object.assign(IMP,{cols:[],rows:[],map:{},nombre:'',nuevos:{},ocultas:[],aviso:''});render();
  toast(`Nuevos: ${n}.`+(dup.ne||dup.na||dup.nc?' '+textoDup(dup):'')+(act?` Actualizados: ${act}.`:'')+(nAct?` Actuaciones: ${nAct}.`:'')+(nEv?` Añadidos ${nEv} plazos futuros a la agenda.`:'')+(creados?` Añadidos ${creados} datos nuevos a la ficha.`:'')+(rep?` ${rep} ya existían y se han saltado.`:'')+(sin?` ${sin} filas sin datos suficientes.`:'')+(nuevosCli?` Se han creado ${nuevosCli} clientes nuevos.`:''))}
-const AJ_MENU=[['despacho','Datos del despacho','Nombre, NIF, dirección e IVA para las facturas'],['letrados','Letrados y procuradores','Nombres, correos y teléfonos'],['listas','Listas desplegables','Asuntos, situaciones y procuradores'],['fichas','Datos de las fichas','Qué datos se ven y en qué orden'],['importar','Importar datos','Clientes y expedientes desde Microarea'],['duplicados','Duplicados','Buscar y unir registros repetidos'],['sincronizacion','Sincronización','Sesión y conexión con la nube'],['borrar','Borrar datos','Eliminar todos los datos']];
+const AJ_MENU=[['despacho','Datos del despacho','Nombre, NIF, dirección e IVA para las facturas'],['letrados','Letrados y procuradores','Nombres, correos y teléfonos'],['listas','Listas desplegables','Asuntos, situaciones y procuradores'],['fichas','Datos de las fichas','Qué datos se ven y en qué orden'],['importar','Importar datos','Clientes y expedientes desde Microarea'],['duplicados','Duplicados','Buscar y unir registros repetidos'],['sincronizacion','Sincronización','Sesión y conexión con la nube'],['juzgados','Juzgados: nueva denominación','Tribunales de Instancia (LO 1/2025)'],['borrar','Borrar datos','Eliminar todos los datos']];
 V.ajustes=(sub)=>{const d=S.ajustes.despacho,a=S.ajustes;
  const SEC={despacho:()=>sec('Datos del despacho','',`<div class="panel"><p class="nota">Aparecen en la cabecera de las facturas.</p><div class="grid">${[['nombre','Nombre del despacho o del letrado'],['nif','NIF',1],['telefono','Teléfono',1],['direccion','Dirección completa'],['email','Correo electrónico',1],['iban','IBAN para transferencias',1]].map(([k,l,h])=>`<div class="fld${h?' half':''}"><label for="d_${k}">${l}</label><input id="d_${k}" data-d="${k}" value="${esc(d[k])}"></div>`).join('')}
  <div class="fld half"><label for="a_serie">Serie de facturas</label><input id="a_serie" value="${esc(a.serie)}" placeholder="Ej.: F"></div><div class="fld half"><label for="a_iva">IVA por defecto (%)</label><input id="a_iva" inputmode="decimal" value="${esc(a.iva)}"></div><div class="fld half"><label for="a_irpf">Retención IRPF por defecto (%)</label><input id="a_irpf" inputmode="decimal" value="${esc(a.irpf)}"></div></div><button class="btn pri" data-a="guardarAj">Guardar datos</button></div>`),
@@ -905,12 +912,45 @@ V.ajustes=(sub)=>{const d=S.ajustes.despacho,a=S.ajustes;
  importar:()=>sec('Importar datos','',importHTML()),
  duplicados:()=>sec('Duplicados','',`<div class="panel"><p>Busca expedientes con el mismo número, actuaciones repetidas y clientes creados dos veces, y los une sin perder tus cambios.</p><button class="btn" data-a="dups">Buscar y unir duplicados</button>${(()=>{const m=expMalos();return m.length?`<div class="aviso-malos"><p><strong>${m.length} expediente${m.length>1?'s':''} con número incorrecto.</strong> Se crearon por el fallo de importación de versiones anteriores y pueden mezclar actuaciones de varios expedientes:</p><ul>${m.slice(0,8).map(e=>`<li><a href="#expediente/${e.id}">${esc(e.numero)}</a>, ${esc(cliNom(e.clienteId))}, ${(e.actuaciones||[]).length} actuaciones</li>`).join('')}${m.length>8?`<li>y ${m.length-8} más</li>`:''}</ul><p>Bórralos y vuelve a importar el Excel de expedientes: se crearán bien, cada uno con su número.</p><button class="btn dan" data-a="borraMalos">Borrar estos expedientes</button></div>`:''})()}</div>`),
  sincronizacion:()=>sec('Sincronización','',fbOk&&usuario?`<div class="panel"><p>Sesión iniciada como <strong>${esc(usuario.email)}</strong>. Tus datos son los mismos en todos los dispositivos donde entres con esta cuenta.</p><p class="nota" id="estadoRed">${textoRed()}</p><button class="btn" data-a="salir">Cerrar sesión</button></div>`:`<div class="panel"><p>No se ha podido cargar la sincronización, probablemente por falta de conexión. Los cambios se guardan en este dispositivo.</p></div>`),
+ juzgados:()=>juzgadosHTML(),
  borrar:()=>sec('Borrar todo','',`<div class="panel"><p>Elimina todos los clientes, expedientes, plazos y facturas${fbOk&&usuario?' de tu cuenta, en todos tus dispositivos':' de este dispositivo'}. Descarga antes una copia si la necesitas.</p><button class="btn dan" data-a="borrarTodo">Borrar todos los datos</button></div>`)};
  if(sub&&SEC[sub]){const t=AJ_MENU.find(x=>x[0]===sub);return volver('#ajustes','Ajustes')+cab(t[1])+SEC[sub]().replace(/^<div class="sechead"><h2>[^<]*<\/h2><\/div>/,'')}
  return cab('Ajustes')+`<div class="ajmenu">${AJ_MENU.map(([k,t,dsc])=>`<a class="ajbtn${k==='borrar'?' peligro':''}" href="#ajustes/${k}"><b>${esc(t)}</b><span>${esc(dsc)}</span></a>`).join('')}</div>`+
  `<p class="nota pie">Versión ${VERSION}. ${S.clientes.length} clientes, ${S.expedientes.length} expedientes, ${S.eventos.length} plazos y citas, ${S.facturas.length} facturas.</p>`};
 
 V.copias=()=>cab('Copias de seguridad')+sec('Copias automáticas','',`<div class="panel"><p class="nota">Se guarda una copia completa en este dispositivo cada vez que abres la app, al salir de ella si has hecho cambios, y antes de importar, recuperar o borrar. Se conservan las ${MAX_COPIAS} últimas y, además, una de cada día del último mes.</p>${COPIAS.length?`<div class="list" style="margin-bottom:12px">${COPIAS.map(c=>`<div class="row copia"><div class="txt"><div class="t">${fCopia(c.fecha)}</div><div class="s">${esc(c.motivo)} · ${c.nc.toLocaleString('es-ES')} clientes, ${c.ne.toLocaleString('es-ES')} expedientes</div></div><button type="button" class="btn sm ghost" data-a="bajarCopia" data-c="${c.id}" title="Descargar en archivo">Descargar</button><button type="button" class="btn sm" data-a="recuperarCopia" data-c="${c.id}">Recuperar</button></div>`).join('')}</div>`:'<p>Todavía no hay copias automáticas.</p>'}<div class="rapidos"><button class="btn" data-a="copiaAhora">Hacer una copia ahora</button><label class="btn ghost">Recuperar desde un archivo<input type="file" accept=".json,application/json" data-c="restaurar" hidden></label></div></div>`);
+const PART_LOC=['de','del','la','las','los','y','el','e'];
+const TILDES={'mostoles':'Móstoles','leganes':'Leganés','torrejon de ardoz':'Torrejón de Ardoz','alcala de henares':'Alcalá de Henares','alcorcon':'Alcorcón','pozuelo de alarcon':'Pozuelo de Alarcón','san sebastian de los reyes':'San Sebastián de los Reyes','san lorenzo de el escorial':'San Lorenzo de El Escorial','avila':'Ávila','leon':'León','cadiz':'Cádiz','malaga':'Málaga','cordoba':'Córdoba','jaen':'Jaén','almeria':'Almería','caceres':'Cáceres','logroño':'Logroño','logrono':'Logroño','castellon':'Castellón','gijon':'Gijón','aviles':'Avilés','alcazar de san juan':'Alcázar de San Juan','talavera de la reina':'Talavera de la Reina','a coruña':'A Coruña','la coruña':'A Coruña','cieza':'Cieza','ecija':'Écija','ubeda':'Úbeda','merida':'Mérida','badajoz':'Badajoz','san martin de valdeiglesias':'San Martín de Valdeiglesias','getafe':'Getafe','majadahonda':'Majadahonda'};
+const capLoc=s=>{const b=String(s||'').trim().toLowerCase().replace(/\s+/g,' ');const t=TILDES[norm(b)]||TILDES[b];if(t)return t;return b.split(' ').filter(Boolean).map((w,i)=>i&&PART_LOC.includes(w)?w:w.split('-').map(x=>x.charAt(0).toUpperCase()+x.slice(1)).join('-')).join(' ')};
+const TIPOS_JZ=[[/violencia (sobre|contra) la mujer|violencia de genero/,'Sección de Violencia sobre la Mujer'],[/(primera|1ª|1a|1º|1) ?instancia e instruccion/,'Sección Civil y de Instrucción'],[/familia/,'Sección de Familia, Infancia y Capacidad',1],[/mercantil/,'Sección de lo Mercantil'],[/contencioso/,'Sección de lo Contencioso-Administrativo'],[/social/,'Sección de lo Social'],[/vigilancia penitenciaria/,'Sección de Vigilancia Penitenciaria'],[/menores/,'Sección de Menores'],[/penal/,'Sección de lo Penal'],[/instruccion/,'Sección de Instrucción'],[/(primera|1ª|1a|1º) ?instancia/,'Sección Civil']];
+function nuevaDenom(s,locDef){const t=norm(s);
+ if(!t)return{v:'',st:'vacio'};
+ if(/tribunal de instancia|audiencia|tribunal superior|supremo|tribunal central|registro civil/.test(t))return{v:s,st:'igual'};
+ const tp=TIPOS_JZ.find(([r])=>r.test(t));if(!tp)return /juzgado|jdo|instancia|instruccion/.test(t)?{v:'',st:'revisar',m:'No reconozco el tipo de juzgado'}:{v:s,st:'igual'};
+ let m=s.match(/n\s*[º°o]\s*\.?\s*(\d+)/i)||s.match(/n[uú]mero\s*(\d+)/i),num='',resto='';
+ if(m){num=m[1];resto=s.slice(m.index+m[0].length)}
+ else{const ms=[...s.matchAll(/(^|[^\dªº])(\d{1,3})(?![\dªº°])/g)];if(ms.length){const x=ms[ms.length-1];num=x[2];resto=s.slice(x.index+x[0].length)}}
+ let bis=false;resto=resto.replace(/^\s*bis\b/i,()=>{bis=true;return ''});
+ let loc=resto.replace(/^[\s\-–,.:]+/,'').replace(/^(de|del)\s+/i,'').trim();
+ if(!loc){const md=s.match(/\s(?:de|del)\s+([A-Za-zÁÉÍÓÚÑáéíóúñ][^,;\d]*)$/i);if(md&&!/instancia|instruccion|instrucción|social|penal|mercantil|mujer|menores/i.test(md[1]))loc=md[1].trim()}
+ const locF=loc?capLoc(loc):(locDef||'');
+ const v=`Tribunal de Instancia${locF?' de '+locF:''}, ${tp[1]}${num?', Plaza nº '+num+(bis?' bis':''):''}`;
+ const avisos=[];if(!locF)avisos.push('falta la localidad');if(!num)avisos.push('falta el número');if(tp[2])avisos.push('en familia el nº de plaza puede haber cambiado');if(bis)avisos.push('era un juzgado «bis»: comprueba su denominación actual');
+ return{v,st:avisos.length?'revisar':'ok',m:avisos.join('; ')}}
+const JZ={loc:'',ed:{},off:{},on:{}};
+const FAMILIA=/familia|divorci|separaci|custodia|alimentos|regimen de visitas|patria potestad|capacidad|incapacita|tutela|curatela|guarda|nulidad matrimon|medidas paterno|liquidacion de (la )?sociedad de gananciales|filiacion/;
+function gruposJZ(){const g=new Map();for(const e of S.expedientes){if(!abierto(e)||!e.juzgado)continue;const k=e.juzgado,x=g.get(k)||{n:0,fam:false};x.n++;if(FAMILIA.test(norm([e.asunto,e.materia,Object.entries(e).filter(([c])=>c.startsWith('x_')).map(([,v])=>typeof v==='string'?v:'').join(' ')].join(' '))))x.fam=true;g.set(k,x)}
+ return [...g.entries()].map(([k,{n,fam}])=>{const partes=k.split(/\s*;\s*/).map(x=>nuevaDenom(x,JZ.loc));let st=partes.some(p=>p.st==='revisar')?'revisar':partes.every(p=>p.st==='igual')?'igual':'ok';
+  const ms=partes.map(p=>p.m).filter(Boolean);if(fam&&st!=='igual'&&partes.some(p=>/Sección Civil,/.test(p.v))){st='revisar';ms.push('el asunto parece de familia o capacidad: puede corresponder a la Sección de Familia, Infancia y Capacidad, con otra numeración')}
+  return{k,n,v:JZ.ed[k]!==undefined?JZ.ed[k]:partes.map(p=>p.v).join('; '),st,m:ms.join('; ')}}).sort((a,b)=>(a.st==='revisar')-(b.st==='revisar')||b.n-a.n)}
+function juzgadosHTML(){const gs=gruposJZ(),cam=gs.filter(g=>g.st!=='igual'),ig=gs.filter(g=>g.st==='igual');
+ return `<div class="panel"><p>Los juzgados son ahora <b>Tribunales de Instancia</b> divididos en secciones y plazas (Ley Orgánica 1/2025). Las <b>Audiencias Provinciales no cambian</b>. Solo se tratan los expedientes <b>abiertos</b>: en los cerrados se mantiene el nombre que tenía el juzgado entonces.</p>
+ <p class="nota"><b>Ojo con familia y capacidad:</b> en Madrid y otros partidos grandes, los antiguos juzgados de familia e incapacidades pasaron a la <b>Sección de Familia, Infancia y Capacidad</b>, con otra numeración. Esos casos salen marcados en naranja para que los corrijas.</p>
+ <p class="nota">Revisa cada propuesta: puedes corregirla escribiendo en la casilla y desmarcar las que no quieras cambiar. El nombre antiguo se guarda en «Denominación anterior del juzgado» y no se pierde. Comprueba los dudosos en LexNET o en las notificaciones recientes del juzgado.</p>
+ <div class="fld"><label for="jzLoc">Localidad para los que no la indican</label><input id="jzLoc" data-c="jzLoc" value="${esc(JZ.loc)}" placeholder="Por ejemplo: Madrid"></div></div>
+ ${cam.length?`<div class="list jzl">${cam.map((g,i)=>`<div class="row jz ${g.st}"><input type="checkbox" data-c="jzOn" data-k="${i}"${g.v&&(JZ.on[g.k]||(g.st==='ok'&&!JZ.off[g.k]))?' checked':''} aria-label="Cambiar"><div class="txt"><div class="s">${esc(g.k)} · ${g.n} expediente${g.n>1?'s':''}</div><textarea class="jzv" data-c="jzEd" data-k="${i}" rows="3" placeholder="Escribe la nueva denominación">${esc(g.v)}</textarea>${g.m?`<div class="jzm">⚠ ${esc(g.m)}</div>`:''}</div></div>`).join('')}</div>
+ <div class="rapidos" style="margin-top:12px"><button class="btn pri" data-a="aplicarJZ">Aplicar los cambios marcados</button></div>`:vacio('No hay juzgados que actualizar en los expedientes abiertos.')}
+ ${ig.length?`<p class="nota" style="margin-top:14px">${ig.reduce((s,g)=>s+g.n,0)} expedientes abiertos ya tienen la denominación actual o están en una Audiencia u otro tribunal que no cambia.</p>`:''}`}
 const LISTAS={asuntos:'Asuntos',situaciones:'Situaciones'};let LE='asuntos';
 function listasHTML(){if(!LISTAS[LE])LE='asuntos';const l=(S.ajustes.listas||{})[LE]||[];
  return `<div class="panel"><p class="nota">Elementos de los desplegables del expediente. También puedes añadirlos desde el propio desplegable con «➕ Añadir nuevo…».</p><div class="chips">${Object.entries(LISTAS).map(([k,n])=>`<button type="button" class="chip${LE===k?' on':''}" data-a="le" data-v="${k}">${n} <span class="cnt">${((S.ajustes.listas||{})[k]||[]).length}</span></button>`).join('')}</div>${l.length?`<div class="list" style="margin-bottom:12px">${l.map((n,i)=>LE==='procuradores'?filaContacto('procurador',n,i,'quitaLista'):`<div class="row"><div class="txt"><div class="t">${esc(n)}</div></div><button type="button" class="btn sm ghost dan" data-a="quitaLista" data-i="${i}">Quitar</button></div>`).join('')}</div>`:''}${LE==='procuradores'?formContacto('nuevoLista'):`<div class="addact" style="grid-template-columns:1fr auto"><input id="nuevoLista" placeholder="Nuevo elemento" aria-label="Nuevo elemento"><button class="btn pri" data-a="addLista">Añadir</button></div>`}</div>`}
@@ -1037,6 +1077,12 @@ const ACT={
   const o={importe:(a,b)=>num(b.prevHonorarios)-num(a.prevHonorarios),cliente:(a,b)=>cliNom(a.clienteId).localeCompare(cliNom(b.clienteId),'es'),expediente:(a,b)=>String(a.numero).localeCompare(String(b.numero),'es',{numeric:true})}[FL.prev];l.sort(o);
   if(!l.length){toast('No hay importes que imprimir');return}const t=r2(l.reduce((s,e)=>s+num(e.prevHonorarios),0));
   imprimirLista('Previsión de honorarios pendientes',`${l.length} expedientes abiertos`,[{t:'Expediente'},{t:'Asunto'},{t:'Cliente'},{t:'Importe',r:1}],l.map(e=>[e.numero,e.asunto&&e.asunto!==e.numero?e.asunto:'',cliNom(e.clienteId),eur(num(e.prevHonorarios))]),['','','Total',eur(t)])},
+ aplicarJZ:async()=>{const gs=gruposJZ().filter(g=>g.st!=='igual');const sel=gs.filter((g,i)=>{const c=document.querySelector(`[data-c="jzOn"][data-k="${i}"]`);return c&&c.checked&&String(g.v).trim()});
+  if(!sel.length){toast('No hay ningún cambio marcado');return}const n=sel.reduce((s,g)=>s+g.n,0);
+  if(!confirm(`¿Cambiar el nombre del juzgado en ${n} expedientes abiertos? El nombre antiguo se guardará en «Denominación anterior del juzgado».`))return;
+  await hacerCopia('Antes de actualizar juzgados',true);
+  for(const g of sel){const v=String(g.v).trim();for(const e of S.expedientes)if(abierto(e)&&e.juzgado===g.k){e.juzgadoAnterior=g.k;e.juzgado=v}}
+  JZ.ed={};JZ.off={};JZ.on={};save();render();toast(`Actualizados ${n} expedientes`)},
  revisado:id=>{const e=byId('expedientes',id);e.ultimaRevision=hoy();save();render();toast('Última revisión: hoy')},
  mailAct:(id,b)=>mailActuacion(id,b.dataset.act),
  addProc:()=>{const v=$('#nuevoProc').value.trim();if(!v){$('#nuevoProc').focus();return}const ls=S.ajustes.listas=Object.assign({},S.ajustes.listas),l=[...(ls.procuradores||[])];if(l.some(x=>norm(x)===norm(v))){toast('Ese procurador ya está en la lista');return}
@@ -1079,6 +1125,8 @@ document.addEventListener('change',async e=>{const t=e.target,c=t.dataset&&t.dat
  if(c==='hecho'&&String(t.dataset.id).startsWith('act|')){const {a}=actDe(t.dataset.id);if(a){a.pendiente=!t.checked;save();render();toast(t.checked?'Tarea terminada. Sigue en Actuaciones':'Marcada como pendiente')}}
  else if(c==='hecho'){const ev=byId('eventos',t.dataset.id);if(!ev)return;ev.hecho=t.checked;save();render();toast(t.checked?'Marcado como hecho':'Marcado como pendiente')}
  else if(c==='impDest'){IMP.dest=t.value;IMP.map=adivinar(IMP.cols,IMP.dest);IMP.nuevos={};render()}
+ else if(c==='jzLoc'){JZ.loc=capLoc(t.value.trim());render()}
+ else if(c==='jzEd'||c==='jzOn'){const g=gruposJZ().filter(x=>x.st!=='igual')[+t.dataset.k];if(!g)return;if(c==='jzEd'){JZ.ed[g.k]=t.value;JZ.on[g.k]=true;JZ.off[g.k]=false;const cb=document.querySelector(`[data-c="jzOn"][data-k="${t.dataset.k}"]`);if(cb)cb.checked=true}else{JZ.off[g.k]=!t.checked;JZ.on[g.k]=t.checked}}
  else if(c==='impMap'){IMP.map[t.dataset.k]=t.value;render()}
  else if(c==='impNOn'||c==='impNNom'){const i=+t.dataset.i;const n=IMP.nuevos[i]||{on:!IMP.ocultas.includes(IMP.cols[i]),nombre:IMP.cols[i]};if(c==='impNOn')n.on=t.checked;else n.nombre=t.value.trim()||IMP.cols[i];IMP.nuevos[i]=n}
  else if(c==='impFile'){const f=t.files[0];if(!f)return;toast('Leyendo el archivo…');try{const r=await leerHoja(f);if(r.dest)IMP.dest=r.dest;Object.assign(IMP,{cols:r.cols,rows:r.rows,nombre:f.name,map:adivinar(r.cols,IMP.dest),nuevos:{},ocultas:r.ocultas||[],aviso:r.aviso||''});render()}catch(err){toast(err.message||'No se ha podido leer el archivo.')}}
