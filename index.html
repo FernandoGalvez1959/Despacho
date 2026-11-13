@@ -320,14 +320,13 @@ const IDB={p:null,abrir(){return this.p||(this.p=new Promise((ok,ko)=>{const r=i
 let tGuardar=null,avisoAlm=false;
 /* ---------- Copias automáticas ---------- */
 let COPIAS=[],cambiosCopia=0,ultCopiaMs=0,copiando=false;
-const MAX_COPIAS=10;
+const MAX_COPIAS=3;
 async function cargarCopias(){try{COPIAS=(await IDB.get('copias'))||[]}catch(e){COPIAS=[]}ultCopiaMs=COPIAS.length?Date.parse(COPIAS[0].fecha):0}
 async function hacerCopia(motivo,forzar){if(!cargado||copiando)return;const nc=S.clientes.length,ne=S.expedientes.length;if(!nc&&!ne)return;
  if(!forzar&&!cambiosCopia&&COPIAS.length)return;copiando=true;
  try{const id=String(Date.now()),snap=JSON.parse(JSON.stringify(S));await IDB.set('copia:'+id,snap);
   COPIAS.unshift({id,fecha:new Date().toISOString(),motivo,nc,ne});
-  const dia=c=>new Date(c.fecha).toLocaleDateString('es-ES'),limite=Date.now()-30*864e5,quedan=COPIAS.slice(0,MAX_COPIAS),vistos=new Set(quedan.map(dia));
-  for(const c of [...COPIAS.slice(MAX_COPIAS)].reverse()){if(Date.parse(c.fecha)>=limite&&!vistos.has(dia(c))){quedan.push(c);vistos.add(dia(c))}}
+  const quedan=COPIAS.slice(0,MAX_COPIAS);
   quedan.sort((a,b)=>b.fecha.localeCompare(a.fecha));const sobran=COPIAS.filter(c=>!quedan.includes(c));COPIAS.length=0;COPIAS.push(...quedan);
   await IDB.set('copias',COPIAS);for(const c of sobran)await IDB.del('copia:'+c.id).catch(()=>{});cambiosCopia=0;ultCopiaMs=Date.now()}catch(e){console.error(e)}
  copiando=false;if(location.hash==='#copias'&&!dlg.open)render()}
@@ -782,7 +781,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='44';
+const VERSION='45';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -926,7 +925,8 @@ V.ajustes=(sub)=>{const d=S.ajustes.despacho,a=S.ajustes;
  return cab('Ajustes')+`<div class="ajmenu">${AJ_MENU.map(([k,t,dsc])=>`<a class="ajbtn${k==='borrar'?' peligro':''}" href="#ajustes/${k}"><b>${esc(t)}</b><span>${esc(dsc)}</span></a>`).join('')}</div>`+
  `<p class="nota pie">Versión ${VERSION}. ${S.clientes.length} clientes, ${S.expedientes.length} expedientes, ${S.eventos.length} plazos y citas, ${S.facturas.length} facturas.</p>`};
 
-V.copias=()=>cab('Copias de seguridad')+sec('Copias automáticas','',`<div class="panel"><p class="nota">Se guarda una copia completa en este dispositivo cada vez que abres la app, al salir de ella si has hecho cambios, y antes de importar, recuperar o borrar. Se conservan las ${MAX_COPIAS} últimas y, además, una de cada día del último mes.</p>${COPIAS.length?`<div class="list" style="margin-bottom:12px">${COPIAS.map(c=>`<div class="row copia"><div class="txt"><div class="t">${fCopia(c.fecha)}</div><div class="s">${esc(c.motivo)} · ${c.nc.toLocaleString('es-ES')} clientes, ${c.ne.toLocaleString('es-ES')} expedientes</div></div><button type="button" class="btn sm ghost" data-a="bajarCopia" data-c="${c.id}" title="Descargar en archivo">Descargar</button><button type="button" class="btn sm" data-a="recuperarCopia" data-c="${c.id}">Recuperar</button></div>`).join('')}</div>`:'<p>Todavía no hay copias automáticas.</p>'}<div class="rapidos"><button class="btn" data-a="copiaAhora">Hacer una copia ahora</button><label class="btn ghost">Recuperar desde un archivo<input type="file" accept=".json,application/json" data-c="restaurar" hidden></label></div></div>`);
+V.copias=()=>cab('Copias de seguridad')+`<div class="panel copias-top"><div class="rapidos"><button class="btn pri" data-a="copiaAhora">Hacer copia ahora</button><label class="btn">Restaurar desde un archivo<input type="file" accept=".json,application/json" data-c="restaurar" hidden></label></div><p class="nota" style="margin:10px 0 0">«Hacer copia ahora» guarda un archivo <b>Despacho ${nombreCopia(new Date()).slice(9,17)}.json</b>: en el ordenador eliges la carpeta; en el móvil va a Descargas. Guárdalo en tu Drive.</p></div>`+
+ sec('Copias automáticas','',`<div class="panel"><p class="nota">Se guarda una copia dentro de este dispositivo cada vez que abres la app, al salir si has hecho cambios, y antes de importar, recuperar o borrar. Se conservan las ${MAX_COPIAS} últimas.</p>${COPIAS.length?`<div class="list">${COPIAS.map(c=>`<div class="row copia"><div class="txt"><div class="t">${fCopia(c.fecha)}</div><div class="s">${esc(c.motivo)} · ${c.nc.toLocaleString('es-ES')} clientes, ${c.ne.toLocaleString('es-ES')} expedientes</div></div><button type="button" class="btn sm ghost" data-a="bajarCopia" data-c="${c.id}" title="Descargar en archivo">Descargar</button><button type="button" class="btn sm" data-a="recuperarCopia" data-c="${c.id}">Recuperar</button></div>`).join('')}</div>`:'<p>Todavía no hay copias automáticas.</p>'}</div>`);
 const PART_LOC=['de','del','la','las','los','y','el','e'];
 const TILDES={'mostoles':'Móstoles','leganes':'Leganés','torrejon de ardoz':'Torrejón de Ardoz','alcala de henares':'Alcalá de Henares','alcorcon':'Alcorcón','pozuelo de alarcon':'Pozuelo de Alarcón','san sebastian de los reyes':'San Sebastián de los Reyes','san lorenzo de el escorial':'San Lorenzo de El Escorial','avila':'Ávila','leon':'León','cadiz':'Cádiz','malaga':'Málaga','cordoba':'Córdoba','jaen':'Jaén','almeria':'Almería','caceres':'Cáceres','logroño':'Logroño','logrono':'Logroño','castellon':'Castellón','gijon':'Gijón','aviles':'Avilés','alcazar de san juan':'Alcázar de San Juan','talavera de la reina':'Talavera de la Reina','a coruña':'A Coruña','la coruña':'A Coruña','cieza':'Cieza','ecija':'Écija','ubeda':'Úbeda','merida':'Mérida','badajoz':'Badajoz','san martin de valdeiglesias':'San Martín de Valdeiglesias','getafe':'Getafe','majadahonda':'Majadahonda'};
 const capLoc=s=>{const b=String(s||'').trim().toLowerCase().replace(/\s+/g,' ');const t=TILDES[norm(b)]||TILDES[b];if(t)return t;return b.split(' ').filter(Boolean).map((w,i)=>i&&PART_LOC.includes(w)?w:w.split('-').map(x=>x.charAt(0).toUpperCase()+x.slice(1)).join('-')).join(' ')};
@@ -1111,7 +1111,7 @@ const ACT={
  impCancel:()=>{Object.assign(IMP,{cols:[],rows:[],map:{},nombre:'',nuevos:{},ocultas:[],aviso:''});render()},
  exportar:async()=>{const ok=await guardarCopiaArchivo(nombreCopia(new Date()),async()=>S);if(!ok)return;localStorage.setItem(KEY_DESC,String(Date.now()));localStorage.removeItem(KEY_POSP);render()},
  posponerCopia:()=>{localStorage.setItem(KEY_POSP,String(Date.now()+864e5));render()},
- copiaAhora:()=>{hacerCopia('Copia manual',true).then(()=>toast('Copia guardada en este dispositivo'))},
+ copiaAhora:async()=>{const ok=await guardarCopiaArchivo(nombreCopia(new Date()),async()=>S);if(!ok)return;localStorage.setItem(KEY_DESC,String(Date.now()));localStorage.removeItem(KEY_POSP);await hacerCopia('Copia manual',true);render()},
  bajarCopia:async(id,b)=>{const c=COPIAS.find(x=>x.id===b.dataset.c);if(!c)return;const ok=await guardarCopiaArchivo(nombreCopia(new Date(c.fecha)),()=>IDB.get('copia:'+c.id));if(ok){localStorage.setItem(KEY_DESC,String(Date.now()));localStorage.removeItem(KEY_POSP)}},
  recuperarCopia:async(id,b)=>{const c=COPIAS.find(x=>x.id===b.dataset.c);if(!c)return;
   if(!confirm(`¿Recuperar la copia del ${fCopia(c.fecha)}? (${c.nc} clientes, ${c.ne} expedientes)\n\nLos datos actuales se sustituirán${fbOk&&usuario?', también en la nube y en tus otros dispositivos':''}. Antes se guardará una copia del estado actual por si quieres volver atrás.`))return;
