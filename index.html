@@ -336,6 +336,14 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 const fCopia=iso=>{const d=new Date(iso);return d.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'})+' a las '+d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})};
 const nombreCopia=d=>'Despacho '+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'.json';
 function descargarJSON(obj,nombre){const b=new Blob([JSON.stringify(obj,null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=nombre;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}
+// En el ordenador abre «Guardar como» (eliges carpeta); en el móvil descarga a Descargas.
+// La ventana se abre ANTES de leer los datos, para que el navegador no bloquee la descarga.
+const escritorio=()=>!!window.showSaveFilePicker&&!matchMedia('(pointer:coarse)').matches;
+async function guardarCopiaArchivo(nombre,obtener){
+ if(escritorio()){let fh;try{fh=await window.showSaveFilePicker({suggestedName:nombre,types:[{description:'Copia de Despacho',accept:{'application/json':['.json']}}]})}catch(e){if(e&&e.name==='AbortError')return false;fh=null}
+  if(fh){const datos=await obtener();if(!datos){toast('No se encuentra esa copia');return false}const w=await fh.createWritable();await w.write(JSON.stringify(datos,null,1));await w.close();toast('Copia guardada: '+fh.name);return true}}
+ const datos=await obtener();if(!datos){toast('No se encuentra esa copia');return false}descargarJSON(datos,nombre);
+ toast(matchMedia('(pointer:coarse)').matches?'Copia descargada en la carpeta Descargas':'Copia descargada en la carpeta Descargas (Ctrl+J para verla)');return true}
 const KEY_DESC='despacho_ultDescarga',KEY_POSP='despacho_posponer';
 function avisoCopiaHTML(){if(!S.clientes.length&&!S.expedientes.length)return '';const ult=+localStorage.getItem(KEY_DESC)||0,posp=+localStorage.getItem(KEY_POSP)||0,ahora=Date.now();
  if(ahora-ult<7*864e5||ahora<posp)return '';const dias=ult?Math.floor((ahora-ult)/864e5):0;
@@ -774,7 +782,7 @@ function adivinar(cols,dest){const m={},usadas=new Set();const nc=cols.map(c=>[c
   if(hit){m[f.k]=hit[0];usadas.add(hit[0])}}return m}
 function cargarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('Para leer archivos de Excel hace falta conexión a internet.'))};document.head.appendChild(s)})}
 const TITULOS=['datos personales','telefonos','datos bancarios','listado general de clientes','observaciones','direcciones de envio'];
-const VERSION='43';
+const VERSION='44';
 const BONITO={'Cif':'CIF','Nif':'NIF','Pais':'País','Nombre comun':'Nombre común','E-mail':'Correo electrónico','C.postal':'Código postal','Cuenta p.g.c.':'Cuenta contable','Direccion':'Dirección','Telefono':'Teléfono','Iban':'IBAN','Bic':'BIC','Dc':'DC','Codigo':'Código','Código':'Código'};
 const EXCLUIR=['Cuenta contable','Forma pago','Forma de pago'];
 const bonito=s=>{const k=cap(String(s).replace(/:$/,'').trim().toLowerCase());return BONITO[k]||k};
@@ -1101,10 +1109,10 @@ const ACT={
  guardarAj:()=>{document.querySelectorAll('[data-d]').forEach(i=>S.ajustes.despacho[i.dataset.d]=i.value.trim());S.ajustes.serie=$('#a_serie').value.trim();S.ajustes.iva=num($('#a_iva').value);S.ajustes.irpf=num($('#a_irpf').value);save();toast('Datos guardados')},
  importar:()=>importar(),
  impCancel:()=>{Object.assign(IMP,{cols:[],rows:[],map:{},nombre:'',nuevos:{},ocultas:[],aviso:''});render()},
- exportar:()=>{descargarJSON(S,nombreCopia(new Date()));localStorage.setItem(KEY_DESC,String(Date.now()));localStorage.removeItem(KEY_POSP);render();toast('Copia descargada. Guárdala en tu Drive o en el PC')},
+ exportar:async()=>{const ok=await guardarCopiaArchivo(nombreCopia(new Date()),async()=>S);if(!ok)return;localStorage.setItem(KEY_DESC,String(Date.now()));localStorage.removeItem(KEY_POSP);render()},
  posponerCopia:()=>{localStorage.setItem(KEY_POSP,String(Date.now()+864e5));render()},
  copiaAhora:()=>{hacerCopia('Copia manual',true).then(()=>toast('Copia guardada en este dispositivo'))},
- bajarCopia:async(id,b)=>{const c=COPIAS.find(x=>x.id===b.dataset.c);const s=await IDB.get('copia:'+b.dataset.c);if(!s){toast('No se encuentra esa copia');return}descargarJSON(s,nombreCopia(new Date(c.fecha)))},
+ bajarCopia:async(id,b)=>{const c=COPIAS.find(x=>x.id===b.dataset.c);if(!c)return;const ok=await guardarCopiaArchivo(nombreCopia(new Date(c.fecha)),()=>IDB.get('copia:'+c.id));if(ok){localStorage.setItem(KEY_DESC,String(Date.now()));localStorage.removeItem(KEY_POSP)}},
  recuperarCopia:async(id,b)=>{const c=COPIAS.find(x=>x.id===b.dataset.c);if(!c)return;
   if(!confirm(`¿Recuperar la copia del ${fCopia(c.fecha)}? (${c.nc} clientes, ${c.ne} expedientes)\n\nLos datos actuales se sustituirán${fbOk&&usuario?', también en la nube y en tus otros dispositivos':''}. Antes se guardará una copia del estado actual por si quieres volver atrás.`))return;
   const s=await IDB.get('copia:'+c.id);if(!s){toast('No se encuentra esa copia');return}
